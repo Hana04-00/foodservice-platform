@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Georgia", "Times New Roman", serif;
+}
+
+html,
+body {
+  background-color: #fffaf3;
+  color: #4a3428;
+}
+
+body {
+  background-image:
+    radial-gradient(1200px 500px at 100% -10%, rgba(249, 176, 36, 0.12), transparent),
+    radial-gradient(900px 500px at -10% 0%, rgba(223, 101, 36, 0.10), transparent);
+  min-height: 100vh;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+      transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-masala-600 text-white hover:bg-masala-700 shadow-card;
+  }
+  .btn-ghost {
+    @apply btn border border-masala-200 bg-white/70 text-masala-800 hover:bg-masala-50;
+  }
+  .btn-gold {
+    @apply btn bg-curry-400 text-chai hover:bg-curry-500;
+  }
+  .card {
+    @apply rounded-2xl border border-masala-100 bg-white/85 shadow-card backdrop-blur;
+  }
+  .input {
+    @apply w-full rounded-xl border border-masala-200 bg-white px-3.5 py-2.5 text-sm outline-none
+      focus:border-masala-400 focus:ring-2 focus:ring-masala-200;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-masala-700/80;
+  }
+}

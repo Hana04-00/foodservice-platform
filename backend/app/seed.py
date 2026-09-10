@@ -1,0 +1,220 @@
+"""Seed demo data: admin, customers, menu, subscriptions, a few skips, some
+admin-entered ad-hoc orders, and generated monthly invoices (paid / partial / overdue).
+
+Usage:
+    python -m app.seed            # seed only if the DB looks empty
+    python -m app.seed --reset    # wipe app data first, then seed
+"""
+from __future__ import annotations
+
+import random
+import sys
+from datetime import timedelta
+
+from sqlalchemy import delete, select
+
+from app.clock import now as clock_now
+from app.config import settings
+from app.database import SessionLocal
+from app.models import (
+    Admin,
+    AdHocOrder,
+    AdHocOrderItem,
+    AppSetting,
+    Invoice,
+    InvoiceLine,
+    MealSkip,
+    MenuItem,
+    Subscription,
+    User,
+)
+from app.security import hash_secret
+from app.services.invoicing import build_invoice, mark_paid, record_payment
+
+random.seed(20260902)
+
+MENU = [
+    # meal_type, name, dishes, price, image slug
+    ("lunch", "Rajma Chawal Thali",
+     ["Rajma", "Jeera Rice", "Roti x2", "Kachumber Salad", "Aam Pickle"], 120, "lunch-rajma-chawal"),
+    ("lunch", "Paneer Butter Masala Thali",
+     ["Paneer Butter Masala", "Dal Tadka", "Steamed Rice", "Roti x3", "Gulab Jamun"], 160, "lunch-paneer-butter-masala"),
+    ("lunch", "Aloo Gobi Homestyle Thali",
+     ["Aloo Gobi", "Moong Dal", "Steamed Rice", "Roti x3", "Fresh Curd"], 110, "lunch-aloo-gobi"),
+    ("lunch", "Chole Bhature Special",
+     ["Chole", "Bhature x2", "Onion Salad", "Boondi Raita"], 130, "lunch-chole-bhature"),
+    ("dinner", "Dal Khichdi Comfort Bowl",
+     ["Dal Khichdi", "Gujarati Kadhi", "Roasted Papad", "Ghee", "Pickle"], 100, "dinner-dal-khichdi"),
+    ("dinner", "Kadai Chicken Thali",
+     ["Kadai Chicken", "Jeera Rice", "Roti x3", "Onion Lachha"], 190, "dinner-kadai-chicken"),
+    ("dinner", "Mixed Veg Curry Thali",
+     ["Mixed Vegetable Curry", "Toor Dal", "Steamed Rice", "Roti x3", "Suji Halwa"], 120, "dinner-mixed-veg"),
+    ("dinner", "Palak Paneer Thali",
+     ["Palak Paneer", "Dal Fry", "Steamed Rice", "Roti x3", "Green Salad"], 150, "dinner-palak-paneer"),
+]
+
+CUSTOMERS = [
+    ("Aarti Sharma", "9000000001", "1234", "aarti@example.com", "560001", "12, 3rd Cross, Indiranagar, Bengaluru"),
+    ("Rohan Mehta", "9000000002", "1234", "rohan@example.com", "560038", "44 Jyoti Nivas Road, Koramangala, Bengaluru"),
+    ("Priya Nair", "9000000003", "1234", "priya@example.com", "560095", "7B Sarjapur Main Road, Bengaluru"),
+    ("Imran Khan", "9000000004", "1234", "imran@example.com", "560076", "Flat 302, BTM 2nd Stage, Bengaluru"),
+    ("Sneha Iyer", "9000000005", "1234", "sneha@example.com", "560102", "19 Green Glen Layout, Bellandur, Bengaluru"),
+]
+
+# per-customer plan: (lunch weekdays, lunch plates/day, dinner weekdays | None, lunch item idx | None)
+PLANS = [
+    ([0, 1, 2, 3, 4], 1, [0, 2, 4], 0),        # Aarti: weekday lunch + Mon/Wed/Fri dinner
+    ([0, 1, 2, 3, 4], 2, None, 1),             # Rohan: weekday lunch, 2 plates/day
+    ([0, 1, 2, 3, 4, 5], 1, [0, 1, 2, 3, 4], 2),  # Priya: 6-day lunch + weekday dinner
+    ([1, 3], 1, None, None),                   # Imran: Tue/Thu lunch, kitchen's choice
+    ([0, 1, 2, 3, 4], 1, [5, 6], 3),           # Sneha: weekday lunch + weekend dinner
+]
+
+
+def _reset(db) -> None:
+    for model in (
+        AdHocOrderItem, AdHocOrder, InvoiceLine, Invoice, MealSkip, Subscription,
+        MenuItem, User, Admin, AppSetting,
+    ):
+        db.execute(delete(model))
+    db.commit()
+
+
+def _prev_month(d):
+    return (d.year - 1, 12) if d.month == 1 else (d.year, d.month - 1)
+
+
+def seed() -> None:
+    db = SessionLocal()
+    try:
+        if "--reset" in sys.argv:
+            _reset(db)
+
+        if db.scalar(select(User).limit(1)) and "--reset" not in sys.argv:
+            print("Data already present — pass --reset to rebuild. Nothing to do.")
+            return
+
+        # --- admin -----------------------------------------------------------
+        if not db.scalar(select(Admin).where(Admin.username == settings.admin_username)):
+            db.add(Admin(
+                username=settings.admin_username,
+                password_hash=hash_secret(settings.admin_password),
+            ))
+
+        # --- menu ----------------------------------------------------------
+        items: list[MenuItem] = []
+        for meal, name, dishes, price, slug in MENU:
+            item = MenuItem(
+                meal_type=meal, name=name, dishes="\n".join(dishes), price=price,
+                image_url=f"/images/{slug}.svg", is_active=True,
+            )
+            db.add(item)
+            items.append(item)
+        db.flush()
+        lunch_items = [i for i in items if i.meal_type == "lunch"]
+        dinner_items = [i for i in items if i.meal_type == "dinner"]
+
+        # --- customers + subscriptions ----------------------------------
+        today = clock_now(db).date()
+        start = today - timedelta(days=45)  # so last month's invoice has served days
+        users: list[User] = []
+        subs: list[Subscription] = []
+        for (name, phone, pin, email, pincode, address), (l_days, l_qty, d_days, l_idx) in zip(
+            CUSTOMERS, PLANS
+        ):
+            u = User(
+                name=name, phone=phone, pin_hash=hash_secret(pin), email=email,
+                pincode=pincode, address=address,
+            )
+            db.add(u)
+            db.flush()
+            users.append(u)
+
+            l_item = lunch_items[l_idx] if l_idx is not None else None
+            subs.append(Subscription(
+                user_id=u.id, meal_type="lunch",
+                menu_item_id=l_item.id if l_item else None,
+                weekdays=",".join(str(x) for x in l_days),
+                plates_per_day=l_qty,
+                price=float(l_item.price) if l_item else 115.0,
+                start_date=start, status="active",
+            ))
+            if d_days is not None:
+                d_item = random.choice(dinner_items)
+                subs.append(Subscription(
+                    user_id=u.id, meal_type="dinner", menu_item_id=d_item.id,
+                    weekdays=",".join(str(x) for x in d_days),
+                    plates_per_day=1, price=float(d_item.price),
+                    start_date=start, status="active",
+                ))
+        db.add_all(subs)
+        db.flush()
+
+        # --- a few skips (past + upcoming) --------------------------------
+        for s in subs[:3]:
+            for offset in (-9, 3):
+                d = today + timedelta(days=offset)
+                if d.weekday() in s.weekday_set:
+                    db.add(MealSkip(
+                        subscription_id=s.id, date=d,
+                        created_by="customer" if offset > 0 else "admin",
+                    ))
+        db.flush()
+
+        # --- admin-entered ad-hoc orders (2 past last month, 2 upcoming) ----
+        def _order(user, when, meal, picks):
+            pool = lunch_items if meal == "lunch" else dinner_items
+            o = AdHocOrder(user_id=user.id, date=when, meal_type=meal, status="confirmed",
+                           notes="Guests over" if when >= today else "")
+            amt = 0.0
+            for idx, qty in picks:
+                mi = pool[idx]
+                lt = round(float(mi.price) * qty, 2)
+                amt += lt
+                o.items.append(AdHocOrderItem(
+                    menu_item_id=mi.id, item_name=mi.name, qty=qty,
+                    unit_price=float(mi.price), line_total=lt,
+                ))
+            o.amount = round(amt, 2)
+            db.add(o)
+
+        py, pm = _prev_month(today)
+        last_month_day = today.replace(day=15)
+        last_month_day = (last_month_day.replace(year=py, month=pm)
+                          if last_month_day.month != pm else last_month_day)
+        _order(users[0], last_month_day, "lunch", [(1, 2)])
+        _order(users[2], last_month_day, "dinner", [(0, 1), (2, 1)])
+        _order(users[0], today + timedelta(days=2), "lunch", [(3, 1)])
+        _order(users[3], today + timedelta(days=4), "dinner", [(1, 2)])
+        db.flush()
+
+        # --- monthly invoices: previous month + current month -------------
+        # previous month: 2 fully paid, 1 partial, 2 left (one will read overdue)
+        for i, u in enumerate(users):
+            inv = build_invoice(db, u.id, py, pm, today)
+            if inv is None:
+                continue
+            if i in (0, 2):
+                mark_paid(db, inv, "cash", clock_now(db))
+            elif i == 1 and float(inv.amount) > 0:
+                record_payment(db, inv, round(float(inv.amount) / 2, 2), "cash", clock_now(db))
+            elif i == 4 and inv.due_date is not None:
+                inv.due_date = today - timedelta(days=3)  # force overdue for the demo
+        # current month: generate (unpaid), so the billing screen has live data
+        for u in users:
+            build_invoice(db, u.id, today.year, today.month, today)
+        db.commit()
+
+        n_inv = db.scalar(select(Invoice).order_by(Invoice.id.desc()).limit(1))
+        n_ord = db.scalar(select(AdHocOrder).order_by(AdHocOrder.id.desc()).limit(1))
+        print(f"Seeded {len(users)} customers, {len(items)} menu items, {len(subs)} "
+              f"subscriptions, {n_ord.id if n_ord else 0} ad-hoc orders, "
+              f"invoices up to id {n_inv.id if n_inv else 0}.")
+        print(f"Admin login: {settings.admin_username} / {settings.admin_password}")
+        print("Customer logins: phone 9000000001..9000000005, PIN 1234")
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    seed()
