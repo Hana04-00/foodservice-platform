@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
+import { ErrorBanner } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { saveSession } from "@/lib/session";
 import type { TokenOut } from "@/lib/types";
@@ -20,15 +21,11 @@ export default function AdminLogin() {
     setErr(null);
     setBusy(true);
     try {
-      const res = await api.post<TokenOut>(
-        "/auth/admin/login",
-        { username, password },
-        false,
-      );
+      const res = await api.post<TokenOut>("/auth/admin/login", { username, password }, false);
       saveSession(res.access_token, res.role, null);
       router.push("/admin");
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : "Login failed");
+    } catch (e2) {
+      setErr(e2 instanceof ApiError ? e2.message : "Login failed");
     } finally {
       setBusy(false);
     }
@@ -40,8 +37,8 @@ export default function AdminLogin() {
         <Logo className="text-lg" />
       </Link>
       <div className="card p-6">
-        <h1 className="font-display text-xl font-bold text-chai">Owner sign in</h1>
-        <p className="mt-1 text-sm text-chai/70">Kitchen dashboard &amp; billing.</p>
+        <h1 className="text-xl font-bold text-brand-800">Kitchen owner sign in</h1>
+        <p className="mt-1 text-sm text-ink-soft">Admin dashboard, demand &amp; reports.</p>
         <form onSubmit={submit} className="mt-5 grid gap-3">
           <div>
             <label className="label">Username</label>
@@ -62,21 +59,16 @@ export default function AdminLogin() {
               required
             />
           </div>
-          {err && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>
-          )}
+          {err && <ErrorBanner>{err}</ErrorBanner>}
           <button className="btn-primary mt-1" disabled={busy}>
             {busy ? "Please wait…" : "Sign in"}
           </button>
         </form>
-        <p className="mt-4 text-center text-xs text-chai/60">
+        <p className="mt-4 text-center text-xs text-ink-faint">
           Demo: <b>admin</b> / <b>admin123</b>
         </p>
       </div>
-      <Link
-        href="/login/customer"
-        className="mt-6 text-center text-sm text-masala-600 hover:underline"
-      >
+      <Link href="/login/customer" className="mt-6 text-center text-sm text-brand-600 hover:underline">
         ← Customer login
       </Link>
     </main>

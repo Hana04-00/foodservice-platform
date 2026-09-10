@@ -33,6 +33,7 @@ def register_customer(body: CustomerRegister, db: Session = Depends(get_db)) -> 
         pin_hash=hash_secret(body.pin),
         pincode=body.pincode.strip(),
         address=body.address.strip(),
+        area=body.area.strip(),
     )
     db.add(user)
     db.commit()
@@ -76,6 +77,7 @@ def update_address(
 ) -> UserOut:
     user.address = body.address.strip()
     user.pincode = body.pincode.strip()
+    user.area = body.area.strip()
     db.commit()
     db.refresh(user)
     return UserOut.model_validate(user)

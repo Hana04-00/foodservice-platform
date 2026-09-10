@@ -11,12 +11,12 @@ from sqlalchemy.orm import Session
 from app.clock import now as clock_now
 from app.config import settings
 from app.database import get_db
-from app.routers import admin, auth, billing, menu, orders, subscriptions
+from app.routers import admin, auth, billing, menu, orders, panel, site, subscriptions
 
 log = logging.getLogger("gharse")
 
 app = FastAPI(
-    title="GharSe Tiffin API",
+    title="Ghar Se Tiffin API",
     version="2.0.0",
     description="Subscription-based home-tiffin management: plans, daily plate report, manual billing.",
 )
@@ -37,6 +37,8 @@ for r in (
     billing.router,
     admin.router,
     orders.router,
+    panel.router,
+    site.router,
 ):
     app.include_router(r, prefix=API)
 

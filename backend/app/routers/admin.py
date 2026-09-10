@@ -16,8 +16,10 @@ from app.deps import require_admin
 from app.models import (
     AdHocOrder,
     Invoice,
+    MealCredit,
     MealSkip,
     MenuItem,
+    ServiceArea,
     Subscription,
     User,
 )
@@ -40,6 +42,8 @@ from app.schemas import (
     WEEKDAY_NAMES,
 )
 from app.security import hash_secret
+from app.services import credits as credits_svc
+from app.services import settings_store
 from app.services.invoicing import build_invoice, mark_paid, month_bounds, record_payment
 from app.services.plates import (
     adhoc_orders_between,
@@ -116,6 +120,27 @@ def dashboard(
                 }
             )
 
+    biz = settings_store.get_all(db)
+    cap = {
+        "lunch": int(biz.get("lunch_capacity") or 0),
+        "dinner": int(biz.get("dinner_capacity") or 0),
+    }
+    meal_requirement = []
+    for m in ("lunch", "dinner"):
+        required = report[m]["regular_total"] + max(report[m]["adjustment_total"], 0)
+        confirmed = report[m]["count"]
+        meal_requirement.append(
+            {
+                "meal_type": m,
+                "required": required,
+                "confirmed": confirmed,
+                "gap": required - confirmed,
+                "capacity": cap[m],
+            }
+        )
+
+    cancellations_today = _cancellation_rows(db, day, day)
+
     return {
         "as_of": now.isoformat(),
         "date": day.isoformat(),
@@ -124,15 +149,224 @@ def dashboard(
         "active_subscriptions": active_subs,
         "lunch_plates": report["lunch"]["count"],
         "dinner_plates": report["dinner"]["count"],
+        "lunch_confirmed": report["lunch"]["count"],
+        "dinner_confirmed": report["dinner"]["count"],
+        "lunch_capacity": cap["lunch"],
+        "dinner_capacity": cap["dinner"],
         "plates_today": report["total"],
+        "net_to_prepare": report["total"],
         "orders_today": len(orders_today),
         "extra_plates_today": extra_plates,
-        "cancelled_today": cancelled_today,
+        "cancelled_today": len(cancellations_today),
         "collected_period": collected_period,
         "pending_period": pending_period,
         "outstanding_total": outstanding_total,
+        "meal_requirement": meal_requirement,
+        "area_customers": _area_report(db),
+        "cancellations_today": cancellations_today[:15],
         "todays_meals": todays_meals[:12],
     }
+
+
+# --------------------------------------------------------------- cancellations / demand
+def _cancellation_rows(db: Session, date_from: date, date_to: date) -> list[dict]:
+    """Every cancelled meal in [date_from, date_to], newest meal first, each with its
+    own cancellation timestamp and the carry-forward credit it generated."""
+    rows = db.execute(
+        select(MealSkip, Subscription, User)
+        .join(Subscription, MealSkip.subscription_id == Subscription.id)
+        .join(User, Subscription.user_id == User.id)
+        .where(MealSkip.date >= date_from, MealSkip.date <= date_to)
+        .order_by(MealSkip.date.desc(), MealSkip.id.desc())
+    ).all()
+    sub_items = {
+        s.id: s
+        for s in db.scalars(
+            select(Subscription).options(joinedload(Subscription.menu_item))
+        ).all()
+    }
+    out: list[dict] = []
+    for skip, sub, user in rows:
+        full_sub = sub_items.get(sub.id, sub)
+        credit = db.scalar(
+            select(MealCredit).where(
+                MealCredit.user_id == user.id,
+                MealCredit.meal_date == skip.date,
+                MealCredit.meal_type == sub.meal_type,
+            )
+        )
+        out.append(
+            {
+                "id": skip.id,
+                "meal_date": skip.date.isoformat(),
+                "weekday": WEEKDAY_NAMES[skip.date.weekday()],
+                "cancelled_at": skip.created_at.isoformat() if skip.created_at else None,
+                "cancelled_by": skip.created_by,
+                "customer_id": user.id,
+                "customer_name": user.name,
+                "customer_phone": user.phone,
+                "area": user.area or "-",
+                "meal_type": sub.meal_type,
+                "dish": full_sub.menu_item.name if full_sub.menu_item else "Kitchen's choice",
+                "plates": sub.plates_per_day,
+                "credit": float(credit.amount) if credit else round(float(sub.price) * sub.plates_per_day, 2),
+            }
+        )
+    return out
+
+
+def _area_report(db: Session) -> list[dict]:
+    areas = db.scalars(
+        select(ServiceArea).where(ServiceArea.is_active.is_(True)).order_by(ServiceArea.sort_order, ServiceArea.name)
+    ).all()
+    counts: dict[str, int] = {}
+    for (area,) in db.execute(select(User.area)).all():
+        key = (area or "").strip() or "Unassigned"
+        counts[key] = counts.get(key, 0) + 1
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for a in areas:
+        n = counts.get(a.name, 0)
+        seen.add(a.name)
+        rows.append(
+            {
+                "name": a.name,
+                "pincode": a.pincode,
+                "customers": n,
+                "capacity": a.capacity,
+                "pct": min(round(n / a.capacity * 100), 100) if a.capacity else 0,
+            }
+        )
+    for name, n in counts.items():
+        if name in seen or name == "Unassigned":
+            continue
+        rows.append({"name": name, "pincode": "", "customers": n, "capacity": 0, "pct": 0})
+    if counts.get("Unassigned"):
+        rows.append(
+            {"name": "Unassigned", "pincode": "", "customers": counts["Unassigned"], "capacity": 0, "pct": 0}
+        )
+    return rows
+
+
+@router.get("/cancellations")
+def cancellations(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    today = clock_now(db).date()
+    lo = date_from or (today - timedelta(days=30))
+    hi = date_to or (today + timedelta(days=30))
+    rows = _cancellation_rows(db, lo, hi)
+    return {
+        "date_from": lo.isoformat(),
+        "date_to": hi.isoformat(),
+        "total": len(rows),
+        "total_credit": round(sum(r["credit"] for r in rows), 2),
+        "items": rows,
+    }
+
+
+@router.get("/meal-demand")
+def meal_demand(
+    on: date | None = Query(default=None, alias="date"),
+    db: Session = Depends(get_db),
+) -> dict:
+    day = on or clock_now(db).date()
+    report = plate_report(db, day)
+    biz = settings_store.get_all(db)
+    cap = {"lunch": int(biz.get("lunch_capacity") or 0), "dinner": int(biz.get("dinner_capacity") or 0)}
+    meals = []
+    for m in ("lunch", "dinner"):
+        required = report[m]["regular_total"] + max(report[m]["adjustment_total"], 0)
+        confirmed = report[m]["count"]
+        meals.append(
+            {
+                "meal_type": m,
+                "required": required,
+                "confirmed": confirmed,
+                "gap": required - confirmed,
+                "capacity": cap[m],
+                "prep": report[m]["prep"],
+            }
+        )
+    return {
+        "date": day.isoformat(),
+        "weekday": report["weekday"],
+        "meals": meals,
+        "net_to_prepare": report["total"],
+    }
+
+
+@router.get("/total-meals")
+def total_meals(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    today = clock_now(db).date()
+    lo = date_from or today.replace(day=1)
+    hi = date_to or today
+    if hi < lo:
+        lo, hi = hi, lo
+
+    days: list[dict] = []
+    tot_lunch = tot_dinner = tot_cancel = 0
+    d = lo
+    while d <= hi:
+        rep = plate_report(db, d)
+        cancels = sum(
+            1
+            for meal in ("lunch", "dinner")
+            for r in rep[meal]["rows"]
+            if "Cancelled" in r["notes"]
+        )
+        days.append(
+            {
+                "date": d.isoformat(),
+                "weekday": rep["weekday"],
+                "lunch": rep["lunch"]["count"],
+                "dinner": rep["dinner"]["count"],
+                "total": rep["total"],
+                "cancelled": cancels,
+            }
+        )
+        tot_lunch += rep["lunch"]["count"]
+        tot_dinner += rep["dinner"]["count"]
+        tot_cancel += cancels
+        d += timedelta(days=1)
+
+    return {
+        "date_from": lo.isoformat(),
+        "date_to": hi.isoformat(),
+        "total_lunch": tot_lunch,
+        "total_dinner": tot_dinner,
+        "total_meals": tot_lunch + tot_dinner,
+        "total_cancelled": tot_cancel,
+        "days": days,
+    }
+
+
+@router.get("/area-report")
+def area_report(db: Session = Depends(get_db)) -> dict:
+    rows = _area_report(db)
+    return {
+        "total_customers": sum(r["customers"] for r in rows),
+        "areas": rows,
+    }
+
+
+# --------------------------------------------------------------- settings
+@router.get("/settings")
+def get_settings(db: Session = Depends(get_db)) -> dict:
+    return settings_store.get_all(db)
+
+
+@router.put("/settings")
+def put_settings(body: dict, db: Session = Depends(get_db)) -> dict:
+    out = settings_store.update(db, {k: str(v) for k, v in body.items()})
+    db.commit()
+    return out
 
 
 # --------------------------------------------------------------- plate report / kitchen
@@ -157,7 +391,7 @@ def plate_report_export(
     report = plate_report(db, target)
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["GharSe Tiffin — kitchen list", f"{target.isoformat()} ({report['weekday']})", meal])
+    w.writerow(["Ghar Se Tiffin - kitchen list", f"{target.isoformat()} ({report['weekday']})", meal])
     w.writerow(["Customer", "Phone", "Type", "Item", "Regular", "Adjustment", "Total", "Notes"])
     for r in report[meal]["rows"]:
         w.writerow(
@@ -205,6 +439,7 @@ def _customer_row(db: Session, u: User, today: date) -> dict:
         "email": u.email,
         "pincode": u.pincode,
         "address": u.address,
+        "area": u.area,
         "created_at": u.created_at.isoformat(),
         "subscriptions": [SubscriptionOut.from_model(s).model_dump() for s in subs],
         "plan_summary": ", ".join(
@@ -216,6 +451,7 @@ def _customer_row(db: Session, u: User, today: date) -> dict:
         "status": "active" if active else "inactive",
         "plates_this_month": plates_mtd,
         "amount_due": round(float(due), 2),
+        "credit_balance": credits_svc.balance(db, u.id),
     }
 
 
@@ -231,7 +467,14 @@ def customers(
     stmt = select(User)
     if q:
         like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(User.name.ilike(like), User.phone.ilike(like), User.email.ilike(like)))
+        stmt = stmt.where(
+            or_(
+                User.name.ilike(like),
+                User.phone.ilike(like),
+                User.email.ilike(like),
+                User.area.ilike(like),
+            )
+        )
     users = db.scalars(stmt.order_by(User.name)).all()
     rows = [_customer_row(db, u, today) for u in users]
     if status in ("active", "inactive"):
@@ -246,6 +489,39 @@ def customers(
     }
 
 
+@router.get("/customers/export")
+def customers_export(
+    q: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+) -> Response:
+    today = clock_now(db).date()
+    stmt = select(User)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(User.name.ilike(like), User.phone.ilike(like), User.email.ilike(like), User.area.ilike(like))
+        )
+    users = db.scalars(stmt.order_by(User.name)).all()
+    rows = [_customer_row(db, u, today) for u in users]
+    if status in ("active", "inactive"):
+        rows = [r for r in rows if r["status"] == status]
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Name", "Phone", "Email", "Area", "Pincode", "Plan", "Status", "Plates (MTD)", "Amount due", "Credit balance"])
+    for r in rows:
+        w.writerow([
+            r["name"], r["phone"], r["email"], r["area"], r["pincode"], r["plan_summary"],
+            r["status"], r["plates_this_month"], r["amount_due"], r["credit_balance"],
+        ])
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="customers.csv"'},
+    )
+
+
 @router.post("/customers", status_code=201)
 def create_customer(body: AdminCustomerCreate, db: Session = Depends(get_db)) -> dict:
     if db.scalar(select(User).where(User.phone == body.phone.strip())):
@@ -257,6 +533,7 @@ def create_customer(body: AdminCustomerCreate, db: Session = Depends(get_db)) ->
         email=body.email.strip(),
         pincode=body.pincode.strip(),
         address=body.address.strip(),
+        area=(body.area or "").strip(),
     )
     db.add(user)
     db.commit()
@@ -413,7 +690,9 @@ def customer_profile(user_id: int, db: Session = Depends(get_db)) -> dict:
             "email": user.email,
             "address": user.address,
             "pincode": user.pincode,
+            "area": user.area,
             "created_at": user.created_at.isoformat(),
+            "credit_balance": credits_svc.balance(db, user.id),
         },
         "subscriptions": [SubscriptionOut.from_model(s).model_dump() for s in subs],
         "skips": [
@@ -540,7 +819,10 @@ def admin_skip(sub_id: int, body: SkipRequest, db: Session = Depends(get_db)) ->
     if not db.scalar(
         select(MealSkip).where(MealSkip.subscription_id == sub.id, MealSkip.date == body.date)
     ):
-        db.add(MealSkip(subscription_id=sub.id, date=body.date, created_by="admin"))
+        skip = MealSkip(subscription_id=sub.id, date=body.date, created_by="admin")
+        db.add(skip)
+        db.flush()
+        credits_svc.issue_for_skip(db, sub, body.date, skip_id=skip.id, created_by="admin")
         db.commit()
     return SubscriptionOut.from_model(sub)
 
@@ -554,6 +836,9 @@ def admin_unskip(sub_id: int, skip_date: date, db: Session = Depends(get_db)) ->
         select(MealSkip).where(MealSkip.subscription_id == sub.id, MealSkip.date == skip_date)
     )
     if skip is not None:
+        credits_svc.void_for_skip(
+            db, user_id=sub.user_id, meal_date=skip_date, meal_type=sub.meal_type
+        )
         db.delete(skip)
         db.commit()
     return SubscriptionOut.from_model(sub)

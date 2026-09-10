@@ -1,20 +1,28 @@
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({
+  className = "",
+  tone = "brand",
+}: {
+  className?: string;
+  tone?: "brand" | "light";
+}) {
+  const text = tone === "light" ? "text-white" : "text-brand-800";
+  const accent = tone === "light" ? "#f1f7f3" : "#2c6343";
+  const bowl = tone === "light" ? "#ffffff" : "#234f37";
   return (
-    <span className={`inline-flex items-center gap-2 font-display ${className}`}>
-      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden>
+    <span className={`inline-flex items-center gap-2 font-bold tracking-tight ${text} ${className}`}>
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden>
+        <path d="M6 15h20a10 10 0 0 1-20 0Z" fill={bowl} />
+        <rect x="4" y="12.5" width="24" height="2.6" rx="1.3" fill={accent} />
         <path
-          d="M16 3c5 0 9 3.6 9 8H7c0-4.4 4-8 9-8Z"
-          fill="#df6524"
+          d="M11 12c0-3.3 2.2-6 5-6s5 2.7 5 6"
+          stroke={accent}
+          strokeWidth="2"
+          strokeLinecap="round"
         />
-        <rect x="5" y="12" width="22" height="3.5" rx="1.75" fill="#a63a18" />
-        <path
-          d="M7 17h18c0 5-4 9-9 9s-9-4-9-9Z"
-          fill="#f9b024"
-        />
-        <circle cx="16" cy="7.5" r="1.4" fill="#fffaf3" />
+        <circle cx="16" cy="4.5" r="1.5" fill={accent} />
       </svg>
-      <span className="font-bold tracking-tight">
-        GharSe<span className="text-masala-600"> Tiffin</span>
+      <span className="leading-none">
+        Ghar Se <span className={tone === "light" ? "text-brand-100" : "text-brand-500"}>Tiffin</span>
       </span>
     </span>
   );

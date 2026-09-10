@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
+import { ErrorBanner } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { saveSession } from "@/lib/session";
 import type { TokenOut } from "@/lib/types";
@@ -15,12 +16,12 @@ export default function CustomerLogin() {
     name: "",
     phone: "",
     pin: "",
+    area: "",
     pincode: "",
     address: "",
   });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   async function submit(e: React.FormEvent) {
@@ -28,17 +29,13 @@ export default function CustomerLogin() {
     setErr(null);
     setBusy(true);
     try {
-      const path =
-        mode === "login" ? "/auth/customer/login" : "/auth/customer/register";
-      const payload =
-        mode === "login"
-          ? { phone: form.phone, pin: form.pin }
-          : form;
+      const path = mode === "login" ? "/auth/customer/login" : "/auth/customer/register";
+      const payload = mode === "login" ? { phone: form.phone, pin: form.pin } : form;
       const res = await api.post<TokenOut>(path, payload, false);
       saveSession(res.access_token, res.role, res.user);
-      router.push("/subscription");
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : "Something went wrong");
+      router.push("/dashboard");
+    } catch (e2) {
+      setErr(e2 instanceof ApiError ? e2.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
@@ -51,7 +48,7 @@ export default function CustomerLogin() {
       </Link>
 
       <div className="card p-6">
-        <div className="mb-5 flex gap-1 rounded-xl bg-masala-50 p-1 text-sm font-semibold">
+        <div className="mb-5 flex gap-1 rounded-xl bg-brand-50 p-1 text-sm font-semibold">
           {(["login", "register"] as const).map((m) => (
             <button
               key={m}
@@ -59,8 +56,8 @@ export default function CustomerLogin() {
                 setMode(m);
                 setErr(null);
               }}
-              className={`flex-1 rounded-lg py-2 capitalize transition ${
-                mode === m ? "bg-white text-masala-700 shadow" : "text-chai/60"
+              className={`flex-1 rounded-lg py-2 transition ${
+                mode === m ? "bg-white text-brand-700 shadow-soft" : "text-ink-faint"
               }`}
             >
               {m === "login" ? "Log in" : "Create account"}
@@ -107,14 +104,25 @@ export default function CustomerLogin() {
           </div>
           {mode === "register" && (
             <>
-              <div>
-                <label className="label">Pincode</label>
-                <input
-                  className="input"
-                  value={form.pincode}
-                  onChange={(e) => set("pincode", e.target.value)}
-                  placeholder="560001"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Area</label>
+                  <input
+                    className="input"
+                    value={form.area}
+                    onChange={(e) => set("area", e.target.value)}
+                    placeholder="Indiranagar"
+                  />
+                </div>
+                <div>
+                  <label className="label">Pincode</label>
+                  <input
+                    className="input"
+                    value={form.pincode}
+                    onChange={(e) => set("pincode", e.target.value)}
+                    placeholder="560001"
+                  />
+                </div>
               </div>
               <div>
                 <label className="label">Address</label>
@@ -129,22 +137,20 @@ export default function CustomerLogin() {
             </>
           )}
 
-          {err && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>
-          )}
+          {err && <ErrorBanner>{err}</ErrorBanner>}
 
           <button className="btn-primary mt-1" disabled={busy}>
             {busy ? "Please wait…" : mode === "login" ? "Log in" : "Create account & continue"}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-chai/60">
+        <p className="mt-4 text-center text-xs text-ink-faint">
           Demo customers: phone <b>9000000001</b>–<b>9000000005</b>, PIN <b>1234</b>
         </p>
       </div>
 
-      <Link href="/login/admin" className="mt-6 text-center text-sm text-masala-600 hover:underline">
-        Owner? Go to admin login →
+      <Link href="/login/admin" className="mt-6 text-center text-sm text-brand-600 hover:underline">
+        Kitchen owner? Go to admin login →
       </Link>
     </main>
   );

@@ -17,14 +17,18 @@ from app.clock import now as clock_now
 from app.config import settings
 from app.database import SessionLocal
 from app.models import (
+    BUSINESS_SETTING_DEFAULTS,
     Admin,
     AdHocOrder,
     AdHocOrderItem,
     AppSetting,
     Invoice,
     InvoiceLine,
+    MealCredit,
     MealSkip,
     MenuItem,
+    Plan,
+    ServiceArea,
     Subscription,
     User,
 )
@@ -54,11 +58,30 @@ MENU = [
 ]
 
 CUSTOMERS = [
-    ("Aarti Sharma", "9000000001", "1234", "aarti@example.com", "560001", "12, 3rd Cross, Indiranagar, Bengaluru"),
-    ("Rohan Mehta", "9000000002", "1234", "rohan@example.com", "560038", "44 Jyoti Nivas Road, Koramangala, Bengaluru"),
-    ("Priya Nair", "9000000003", "1234", "priya@example.com", "560095", "7B Sarjapur Main Road, Bengaluru"),
-    ("Imran Khan", "9000000004", "1234", "imran@example.com", "560076", "Flat 302, BTM 2nd Stage, Bengaluru"),
-    ("Sneha Iyer", "9000000005", "1234", "sneha@example.com", "560102", "19 Green Glen Layout, Bellandur, Bengaluru"),
+    ("Aarti Sharma", "9000000001", "1234", "aarti@example.com", "560001", "12, 3rd Cross, Indiranagar, Bengaluru", "Indiranagar"),
+    ("Rohan Mehta", "9000000002", "1234", "rohan@example.com", "560038", "44 Jyoti Nivas Road, Koramangala, Bengaluru", "Koramangala"),
+    ("Priya Nair", "9000000003", "1234", "priya@example.com", "560095", "7B Sarjapur Main Road, Bengaluru", "Sarjapur Road"),
+    ("Imran Khan", "9000000004", "1234", "imran@example.com", "560076", "Flat 302, BTM 2nd Stage, Bengaluru", "BTM Layout"),
+    ("Sneha Iyer", "9000000005", "1234", "sneha@example.com", "560102", "19 Green Glen Layout, Bellandur, Bengaluru", "Bellandur"),
+]
+
+SITE_PLANS = [
+    # name, badge, meals/month, price, meal_type, description, sort
+    ("Basic", "", 20, 2200, "lunch",
+     "One home-style lunch on weekdays. Perfect for a light, regular routine.", 0),
+    ("Standard", "Most Popular", 26, 2730, "lunch",
+     "Lunch six days a week with a rotating thali menu and free carry-forward on cancellations.", 1),
+    ("Premium", "", 52, 5460, "both",
+     "Lunch and dinner, Monday to Saturday. Full flexibility with credits on every skipped meal.", 2),
+]
+
+SERVICE_AREAS = [
+    ("Indiranagar", "560038", 60, 0),
+    ("Koramangala", "560095", 60, 1),
+    ("HSR Layout", "560102", 50, 2),
+    ("BTM Layout", "560076", 45, 3),
+    ("Bellandur", "560103", 40, 4),
+    ("Sarjapur Road", "560035", 40, 5),
 ]
 
 # per-customer plan: (lunch weekdays, lunch plates/day, dinner weekdays | None, lunch item idx | None)
@@ -73,8 +96,8 @@ PLANS = [
 
 def _reset(db) -> None:
     for model in (
-        AdHocOrderItem, AdHocOrder, InvoiceLine, Invoice, MealSkip, Subscription,
-        MenuItem, User, Admin, AppSetting,
+        AdHocOrderItem, AdHocOrder, InvoiceLine, Invoice, MealCredit, MealSkip,
+        Subscription, MenuItem, Plan, ServiceArea, User, Admin, AppSetting,
     ):
         db.execute(delete(model))
     db.commit()
@@ -114,17 +137,32 @@ def seed() -> None:
         lunch_items = [i for i in items if i.meal_type == "lunch"]
         dinner_items = [i for i in items if i.meal_type == "dinner"]
 
+        # --- published plans + service areas + business settings ----------
+        for name, badge, mpm, price, meal_type, desc, order in SITE_PLANS:
+            db.add(Plan(
+                name=name, badge=badge, meals_per_month=mpm, price=price,
+                meal_type=meal_type, description=desc, sort_order=order, is_active=True,
+            ))
+        for name, pincode, cap, order in SERVICE_AREAS:
+            db.add(ServiceArea(
+                name=name, pincode=pincode, capacity=cap, sort_order=order, is_active=True,
+            ))
+        for key, value in BUSINESS_SETTING_DEFAULTS.items():
+            if not db.get(AppSetting, key):
+                db.add(AppSetting(key=key, value=value))
+        db.flush()
+
         # --- customers + subscriptions ----------------------------------
         today = clock_now(db).date()
         start = today - timedelta(days=45)  # so last month's invoice has served days
         users: list[User] = []
         subs: list[Subscription] = []
-        for (name, phone, pin, email, pincode, address), (l_days, l_qty, d_days, l_idx) in zip(
+        for (name, phone, pin, email, pincode, address, area), (l_days, l_qty, d_days, l_idx) in zip(
             CUSTOMERS, PLANS
         ):
             u = User(
                 name=name, phone=phone, pin_hash=hash_secret(pin), email=email,
-                pincode=pincode, address=address,
+                pincode=pincode, address=address, area=area,
             )
             db.add(u)
             db.flush()
@@ -150,14 +188,26 @@ def seed() -> None:
         db.add_all(subs)
         db.flush()
 
-        # --- a few skips (past + upcoming) --------------------------------
+        # --- a few skips (past + upcoming) + the carry-forward credit each earns --
         for s in subs[:3]:
             for offset in (-9, 3):
                 d = today + timedelta(days=offset)
                 if d.weekday() in s.weekday_set:
-                    db.add(MealSkip(
-                        subscription_id=s.id, date=d,
-                        created_by="customer" if offset > 0 else "admin",
+                    by = "customer" if offset > 0 else "admin"
+                    sk = MealSkip(subscription_id=s.id, date=d, created_by=by)
+                    db.add(sk)
+                    db.flush()
+                    db.add(MealCredit(
+                        user_id=s.user_id,
+                        amount=round(float(s.price) * s.plates_per_day, 2),
+                        reason="cancellation",
+                        meal_date=d,
+                        meal_type=s.meal_type,
+                        subscription_id=s.id,
+                        source_skip_id=sk.id,
+                        created_by=by,
+                        status="available",
+                        note=f"{s.meal_type.capitalize()} on {d:%d %b %Y} cancelled",
                     ))
         db.flush()
 

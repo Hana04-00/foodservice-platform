@@ -4,47 +4,83 @@
 
 :root {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Georgia", "Times New Roman", serif;
 }
 
 html,
 body {
-  background-color: #fffaf3;
-  color: #4a3428;
+  background-color: #f8f5ee;
+  color: #2c2a24;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background-image:
-    radial-gradient(1200px 500px at 100% -10%, rgba(249, 176, 36, 0.12), transparent),
-    radial-gradient(900px 500px at -10% 0%, rgba(223, 101, 36, 0.10), transparent);
   min-height: 100vh;
 }
 
 @layer components {
+  /* ---------------------------------------------------------------- buttons */
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
-      transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+      transition active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-masala-600 text-white hover:bg-masala-700 shadow-card;
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-soft;
   }
   .btn-ghost {
-    @apply btn border border-masala-200 bg-white/70 text-masala-800 hover:bg-masala-50;
+    @apply btn border border-brand-200 bg-white text-brand-800 hover:bg-brand-50;
   }
-  .btn-gold {
-    @apply btn bg-curry-400 text-chai hover:bg-curry-500;
+  .btn-danger {
+    @apply btn bg-danger-600 text-white hover:bg-danger-700;
   }
+  .btn-danger-ghost {
+    @apply btn border border-danger-100 bg-white text-danger-600 hover:bg-danger-50;
+  }
+
+  /* ------------------------------------------------------------------ cards */
   .card {
-    @apply rounded-2xl border border-masala-100 bg-white/85 shadow-card backdrop-blur;
+    @apply rounded-2xl border border-brand-100/70 bg-white shadow-card;
   }
+  .stat-card {
+    @apply card p-5;
+  }
+  .stat-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.09em] text-ink-faint;
+  }
+  .stat-value {
+    @apply mt-1.5 text-3xl font-bold text-brand-700;
+  }
+
+  /* ----------------------------------------------------------------- inputs */
   .input {
-    @apply w-full rounded-xl border border-masala-200 bg-white px-3.5 py-2.5 text-sm outline-none
-      focus:border-masala-400 focus:ring-2 focus:ring-masala-200;
-  }
-  .pill {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply w-full rounded-xl border border-brand-200 bg-white px-3.5 py-2.5 text-sm text-ink outline-none
+      transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200;
   }
   .label {
-    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-masala-700/80;
+    @apply mb-1 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-soft;
+  }
+
+  /* ------------------------------------------------------------------ pills */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  /* --------------------------------------------------------------- sidebar */
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-brand-50/80
+      transition hover:bg-white/10 hover:text-white;
+  }
+  .sidebar-link-active {
+    @apply bg-white text-brand-800 shadow-soft hover:bg-white hover:text-brand-800;
+  }
+
+  /* ----------------------------------------------------------------- misc */
+  .section-title {
+    @apply text-2xl font-bold text-brand-800;
+  }
+  .th {
+    @apply px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-ink-faint;
+  }
+  .td {
+    @apply px-4 py-3 text-sm text-ink-soft;
   }
 }

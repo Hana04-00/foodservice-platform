@@ -14,6 +14,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import MealSkip, Subscription, User
 from app.schemas import ScheduleDay, SkipRequest, SubscriptionWithSchedule
+from app.services import credits
 from app.services.cutoff import CutoffError, assert_open, is_open
 from app.services.plates import covers, upcoming_schedule
 
@@ -96,7 +97,10 @@ def skip_meal(
         )
     )
     if exists is None:
-        db.add(MealSkip(subscription_id=sub.id, date=body.date, created_by="customer"))
+        skip = MealSkip(subscription_id=sub.id, date=body.date, created_by="customer")
+        db.add(skip)
+        db.flush()
+        credits.issue_for_skip(db, sub, body.date, skip_id=skip.id, created_by="customer")
         db.commit()
     return _with_schedule(db, _load(db, sub.id))
 
@@ -120,6 +124,9 @@ def unskip_meal(
         )
     )
     if skip is not None:
+        credits.void_for_skip(
+            db, user_id=sub.user_id, meal_date=skip_date, meal_type=sub.meal_type
+        )
         db.delete(skip)
         db.commit()
     return _with_schedule(db, _load(db, sub.id))

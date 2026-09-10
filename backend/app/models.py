@@ -30,6 +30,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(160), nullable=False, default="")
     pincode: Mapped[str] = mapped_column(String(12), nullable=False, default="")
     address: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    area: Mapped[str] = mapped_column(String(80), nullable=False, default="")
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -42,6 +43,9 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     ad_hoc_orders: Mapped[list["AdHocOrder"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    credits: Mapped[list["MealCredit"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -259,6 +263,76 @@ class AdHocOrderItem(Base):
     order: Mapped["AdHocOrder"] = relationship(back_populates="items")
 
 
+class MealCredit(Base):
+    """Carry-forward credit issued to a customer when they cancel a qualifying meal
+    (inside the allowed window). It is a standing balance on the account, carried
+    forward to future meals. `status` is 'available' until it is spent."""
+
+    __tablename__ = "meal_credits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    reason: Mapped[str] = mapped_column(String(20), nullable=False, default="cancellation")
+    meal_date: Mapped[date] = mapped_column(Date, nullable=False)
+    meal_type: Mapped[str] = mapped_column(String(10), nullable=False)  # lunch | dinner
+    subscription_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subscriptions.id"), nullable=True
+    )
+    source_skip_id: Mapped[int | None] = mapped_column(
+        ForeignKey("meal_skips.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by: Mapped[str] = mapped_column(String(10), nullable=False, default="customer")
+    status: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="available"
+    )  # available | consumed
+    note: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="credits")
+
+
+class Plan(Base):
+    """A published pricing plan shown on the public website (Basic / Standard /
+    Premium). Display + enquiry only — subscriptions are still set per customer."""
+
+    __tablename__ = "plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    badge: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    meals_per_month: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    meal_type: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="lunch"
+    )  # lunch | dinner | both
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    @property
+    def price_per_meal(self) -> float:
+        return round(float(self.price) / self.meals_per_month, 2) if self.meals_per_month else 0.0
+
+
+class ServiceArea(Base):
+    """An area the kitchen delivers to. Powers the public 'Areas We Serve' section
+    and the admin area-wise customer report."""
+
+    __tablename__ = "service_areas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    pincode: Mapped[str] = mapped_column(String(12), nullable=False, default="")
+    capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=40)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class AppSetting(Base):
     """Key/value settings row. Holds the admin 'demo clock override' among others."""
 
@@ -273,3 +347,16 @@ class AppSetting(Base):
 
 # Key used by the demo clock override (see app/clock.py).
 CLOCK_OVERRIDE_KEY = "demo_clock_override"
+
+# Business settings surfaced on the public site + admin Settings screen, with defaults.
+BUSINESS_SETTING_DEFAULTS: dict[str, str] = {
+    "business_name": "Ghar Se Tiffin",
+    "tagline": "Home-style meals, delivered fresh every day.",
+    "whatsapp_number": "919000000000",
+    "contact_phone": "+91 90000 00000",
+    "contact_email": "hello@gharsetiffin.example",
+    "service_hours": "Mon-Sat | Lunch 12-2 PM, Dinner 7-9 PM",
+    "cancellation_notice_hours": "4",
+    "lunch_capacity": "60",
+    "dinner_capacity": "45",
+}

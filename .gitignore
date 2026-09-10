@@ -24,3 +24,7 @@ Thumbs.db
 
 # Docker
 *.pid
+
+# Local scratch databases
+backend/_*.db
+*.db-journal

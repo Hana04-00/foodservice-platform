@@ -32,6 +32,7 @@ class CustomerRegister(CustomerLogin):
     name: str = Field(min_length=1, max_length=120)
     pincode: str = Field(default="", max_length=12)
     address: str = Field(default="", max_length=2000)
+    area: str = Field(default="", max_length=80)
 
 
 class AdminLogin(BaseModel):
@@ -51,8 +52,10 @@ class UserOut(BaseModel):
     id: int
     name: str
     phone: str
+    email: str = ""
     pincode: str
     address: str
+    area: str = ""
     created_at: datetime
 
     class Config:
@@ -62,6 +65,7 @@ class UserOut(BaseModel):
 class AddressUpdate(BaseModel):
     address: str = Field(max_length=2000)
     pincode: str = Field(default="", max_length=12)
+    area: str = Field(default="", max_length=80)
 
 
 # ---------------------------------------------------------------- menu
@@ -389,6 +393,7 @@ class AdminCustomerCreate(BaseModel):
     email: str = Field(default="", max_length=160)
     pincode: str = Field(default="", max_length=12)
     address: str = Field(default="", max_length=2000)
+    area: str = Field(default="", max_length=80)
 
     @field_validator("pin")
     @classmethod
@@ -404,6 +409,7 @@ class AdminCustomerUpdate(BaseModel):
     email: Optional[str] = Field(default=None, max_length=160)
     pincode: Optional[str] = Field(default=None, max_length=12)
     address: Optional[str] = Field(default=None, max_length=2000)
+    area: Optional[str] = Field(default=None, max_length=80)
     pin: Optional[str] = Field(default=None, min_length=4, max_length=4)
 
     @field_validator("pin")

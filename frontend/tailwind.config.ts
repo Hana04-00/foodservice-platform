@@ -9,40 +9,61 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Warm, appetizing palette
-        masala: {
-          50: "#fdf6ef",
-          100: "#fbe9d7",
-          200: "#f6cfa8",
-          300: "#efac72",
-          400: "#e78544",
-          500: "#df6524",
-          600: "#c94d1a",
-          700: "#a63a18",
-          800: "#85301a",
-          900: "#6d2a19",
+        // Dark green — sidebar, headings, primary buttons, active nav state
+        brand: {
+          50: "#f1f7f3",
+          100: "#dcebe1",
+          200: "#bcd8c6",
+          300: "#93bda3",
+          400: "#5f9a77",
+          500: "#3d7d57",
+          600: "#2c6343",
+          700: "#234f37",
+          800: "#1c3f2d",
+          900: "#152f22",
         },
-        curry: {
-          50: "#fff9eb",
-          100: "#fef0c7",
-          200: "#fde08a",
-          300: "#fbc94d",
-          400: "#f9b024",
-          500: "#f38d0b",
-          600: "#d76c06",
-          700: "#b24d09",
-          800: "#903d0f",
-          900: "#763310",
+        // Warm off-white / cream backgrounds
+        cream: {
+          DEFAULT: "#f8f5ee",
+          50: "#fdfcf8",
+          100: "#f8f5ee",
+          200: "#efe9db",
         },
-        cream: "#fffaf3",
-        chai: "#4a3428",
+        ink: {
+          DEFAULT: "#2c2a24",
+          soft: "#5b574d",
+          faint: "#8b8578",
+        },
+        // Destructive / warnings only
+        danger: {
+          50: "#fef2f2",
+          100: "#fee2e2",
+          500: "#ef4444",
+          600: "#dc2626",
+          700: "#b91c1c",
+        },
       },
       fontFamily: {
-        display: ["var(--font-display)", "Georgia", "serif"],
-        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: [
+          "var(--font-sans)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
       },
       boxShadow: {
-        card: "0 10px 30px -12px rgba(133, 48, 26, 0.25)",
+        card: "0 1px 2px rgba(21, 47, 34, 0.04), 0 10px 30px -14px rgba(21, 47, 34, 0.18)",
+        soft: "0 1px 3px rgba(21, 47, 34, 0.06)",
+        sidebar: "2px 0 24px -12px rgba(21, 47, 34, 0.35)",
+      },
+      borderRadius: {
+        xl: "0.9rem",
+        "2xl": "1.15rem",
       },
     },
   },
