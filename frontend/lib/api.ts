@@ -2,8 +2,11 @@
 
 import { getToken } from "./session";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
+// Relative by default: the browser calls the site's own origin and the Next.js
+// server proxies /api/* to the backend (see next.config.mjs `rewrites`). This
+// keeps the app working behind ngrok / any tunnel or reverse proxy. Override
+// with NEXT_PUBLIC_API_BASE only to point the browser straight at a backend.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/v1";
 
 export class ApiError extends Error {
   status: number;
