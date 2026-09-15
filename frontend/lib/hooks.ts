@@ -7,12 +7,13 @@ import { getRole, getToken } from "./session";
 import type { SiteSettings } from "./types";
 
 const SITE_FALLBACK: SiteSettings = {
-  business_name: "Ghar Se Tiffin",
+  business_name: "Food Dose Tiffin Service",
   tagline: "Home-style meals, delivered fresh every day.",
-  whatsapp_number: "919000000000",
-  contact_phone: "+91 90000 00000",
-  contact_email: "hello@gharsetiffin.example",
-  service_hours: "Mon-Sat | Lunch 12-2 PM, Dinner 7-9 PM",
+  whatsapp_number: "919354580683",
+  contact_phone: "+91 93545 80683",
+  contact_email: "hello@fooddosetiffinservice.example",
+  contact_address: "4021/33, Reghar Pura, Block 11, Regar Pura, Karol Bagh, New Delhi, Delhi, 110005",
+  service_hours: "Open daily | Closes 9:30 PM",
   cancellation_notice_hours: "4",
 };
 

@@ -38,31 +38,43 @@ from app.services.invoicing import build_invoice, mark_paid, record_payment
 random.seed(20260902)
 
 MENU = [
-    # meal_type, name, dishes, price, image slug
-    ("lunch", "Rajma Chawal Thali",
-     ["Rajma", "Jeera Rice", "Roti x2", "Kachumber Salad", "Aam Pickle"], 120, "lunch-rajma-chawal"),
-    ("lunch", "Paneer Butter Masala Thali",
-     ["Paneer Butter Masala", "Dal Tadka", "Steamed Rice", "Roti x3", "Gulab Jamun"], 160, "lunch-paneer-butter-masala"),
-    ("lunch", "Aloo Gobi Homestyle Thali",
-     ["Aloo Gobi", "Moong Dal", "Steamed Rice", "Roti x3", "Fresh Curd"], 110, "lunch-aloo-gobi"),
-    ("lunch", "Chole Bhature Special",
-     ["Chole", "Bhature x2", "Onion Salad", "Boondi Raita"], 130, "lunch-chole-bhature"),
-    ("dinner", "Dal Khichdi Comfort Bowl",
-     ["Dal Khichdi", "Gujarati Kadhi", "Roasted Papad", "Ghee", "Pickle"], 100, "dinner-dal-khichdi"),
-    ("dinner", "Kadai Chicken Thali",
-     ["Kadai Chicken", "Jeera Rice", "Roti x3", "Onion Lachha"], 190, "dinner-kadai-chicken"),
-    ("dinner", "Mixed Veg Curry Thali",
-     ["Mixed Vegetable Curry", "Toor Dal", "Steamed Rice", "Roti x3", "Suji Halwa"], 120, "dinner-mixed-veg"),
-    ("dinner", "Palak Paneer Thali",
-     ["Palak Paneer", "Dal Fry", "Steamed Rice", "Roti x3", "Green Salad"], 150, "dinner-palak-paneer"),
+    # meal_type, name, dishes, price, image slug — Food Dose Tiffin Service's fixed weekly menu
+    ("lunch", "Monday Lunch Thali",
+     ["Bhindi", "Dal", "4 Roti", "Chawal"], 110, "lunch-monday"),
+    ("dinner", "Monday Dinner Thali",
+     ["Baingan Bharta", "Dal", "4 Roti", "Chawal"], 110, "dinner-monday"),
+    ("lunch", "Tuesday Lunch Thali",
+     ["Chole", "Puri", "Sweet"], 130, "lunch-tuesday"),
+    ("dinner", "Tuesday Dinner Thali",
+     ["Aloo Jeera", "Dal", "4 Roti", "Chawal"], 110, "dinner-tuesday"),
+    ("lunch", "Wednesday Lunch Thali",
+     ["Kofta", "Dal", "4 Roti", "Chawal"], 120, "lunch-wednesday"),
+    ("dinner", "Wednesday Dinner Thali",
+     ["Mix Veg", "Dal", "4 Roti", "Chawal"], 110, "dinner-wednesday"),
+    ("lunch", "Thursday Lunch Thali",
+     ["Kadi", "Loki", "4 Roti", "Chawal"], 110, "lunch-thursday"),
+    ("dinner", "Thursday Dinner Thali",
+     ["Soya Keema", "Dal", "4 Roti", "Chawal"], 120, "dinner-thursday"),
+    ("lunch", "Friday Lunch Thali",
+     ["Rajma", "Seasonal Veg", "4 Roti", "Chawal"], 120, "lunch-friday"),
+    ("dinner", "Friday Dinner Thali",
+     ["Aloo Gobhi", "Dal", "4 Roti", "Chawal"], 110, "dinner-friday"),
+    ("lunch", "Saturday Lunch Thali",
+     ["Veg Biryani", "Raita"], 130, "lunch-saturday"),
+    ("dinner", "Saturday Dinner Thali",
+     ["Dal Makhani", "Kaddu", "4 Roti", "Chawal"], 130, "dinner-saturday"),
+    ("lunch", "Sunday Lunch Thali",
+     ["Soya Bean Aloo", "Dal", "4 Roti", "Chawal"], 120, "lunch-sunday"),
+    ("dinner", "Sunday Dinner Thali",
+     ["Paneer Sabji", "Dal", "4 Roti", "Chawal"], 140, "dinner-sunday"),
 ]
 
 CUSTOMERS = [
-    ("Aarti Sharma", "9000000001", "1234", "aarti@example.com", "560001", "12, 3rd Cross, Indiranagar, Bengaluru", "Indiranagar"),
-    ("Rohan Mehta", "9000000002", "1234", "rohan@example.com", "560038", "44 Jyoti Nivas Road, Koramangala, Bengaluru", "Koramangala"),
-    ("Priya Nair", "9000000003", "1234", "priya@example.com", "560095", "7B Sarjapur Main Road, Bengaluru", "Sarjapur Road"),
-    ("Imran Khan", "9000000004", "1234", "imran@example.com", "560076", "Flat 302, BTM 2nd Stage, Bengaluru", "BTM Layout"),
-    ("Sneha Iyer", "9000000005", "1234", "sneha@example.com", "560102", "19 Green Glen Layout, Bellandur, Bengaluru", "Bellandur"),
+    ("Aarti Sharma", "9000000001", "1234", "aarti@example.com", "110005", "12, Bank Street, Karol Bagh, New Delhi", "Karol Bagh"),
+    ("Rohan Mehta", "9000000002", "1234", "rohan@example.com", "110060", "B-44, Rajinder Nagar, New Delhi", "Rajinder Nagar"),
+    ("Priya Nair", "9000000003", "1234", "priya@example.com", "110008", "7B, Patel Nagar, New Delhi", "Patel Nagar"),
+    ("Imran Khan", "9000000004", "1234", "imran@example.com", "110055", "Flat 302, Paharganj, New Delhi", "Paharganj"),
+    ("Sneha Iyer", "9000000005", "1234", "sneha@example.com", "110012", "19, Pusa Road, New Delhi", "Pusa Road"),
 ]
 
 SITE_PLANS = [
@@ -76,12 +88,12 @@ SITE_PLANS = [
 ]
 
 SERVICE_AREAS = [
-    ("Indiranagar", "560038", 60, 0),
-    ("Koramangala", "560095", 60, 1),
-    ("HSR Layout", "560102", 50, 2),
-    ("BTM Layout", "560076", 45, 3),
-    ("Bellandur", "560103", 40, 4),
-    ("Sarjapur Road", "560035", 40, 5),
+    ("Karol Bagh", "110005", 60, 0),
+    ("Rajinder Nagar", "110060", 60, 1),
+    ("Patel Nagar", "110008", 50, 2),
+    ("Paharganj", "110055", 45, 3),
+    ("Pusa Road", "110012", 40, 4),
+    ("Dev Nagar", "110005", 40, 5),
 ]
 
 # per-customer plan: (lunch weekdays, lunch plates/day, dinner weekdays | None, lunch item idx | None)

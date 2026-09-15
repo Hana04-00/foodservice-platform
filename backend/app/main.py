@@ -16,7 +16,7 @@ from app.routers import admin, auth, billing, menu, orders, panel, site, subscri
 log = logging.getLogger("gharse")
 
 app = FastAPI(
-    title="Ghar Se Tiffin API",
+    title="Food Dose Tiffin Service API",
     version="2.0.0",
     description="Subscription-based home-tiffin management: plans, daily plate report, manual billing.",
 )

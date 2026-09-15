@@ -391,7 +391,7 @@ def plate_report_export(
     report = plate_report(db, target)
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["Ghar Se Tiffin - kitchen list", f"{target.isoformat()} ({report['weekday']})", meal])
+    w.writerow(["Food Dose Tiffin Service - kitchen list", f"{target.isoformat()} ({report['weekday']})", meal])
     w.writerow(["Customer", "Phone", "Type", "Item", "Regular", "Adjustment", "Total", "Notes"])
     for r in report[meal]["rows"]:
         w.writerow(

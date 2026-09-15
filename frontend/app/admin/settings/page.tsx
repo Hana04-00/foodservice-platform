@@ -12,6 +12,7 @@ const FIELDS: { key: keyof AdminSettings; label: string; hint?: string; wide?: b
   { key: "whatsapp_number", label: "WhatsApp number", hint: "Digits with country code, e.g. 919812345678" },
   { key: "contact_phone", label: "Contact phone" },
   { key: "contact_email", label: "Contact email" },
+  { key: "contact_address", label: "Business address", wide: true },
   { key: "service_hours", label: "Service hours", wide: true },
   { key: "cancellation_notice_hours", label: "Cancellation notice (hours)" },
   { key: "lunch_capacity", label: "Lunch capacity (plates/day)" },

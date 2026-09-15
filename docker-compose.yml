@@ -4,13 +4,13 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tiffin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tiffin}
-      POSTGRES_DB: ${POSTGRES_DB:-gharse_tiffin}
+      POSTGRES_DB: ${POSTGRES_DB:-fooddose_tiffin}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tiffin} -d ${POSTGRES_DB:-gharse_tiffin}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tiffin} -d ${POSTGRES_DB:-fooddose_tiffin}"]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -21,7 +21,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-tiffin}:${POSTGRES_PASSWORD:-tiffin}@db:5432/${POSTGRES_DB:-gharse_tiffin}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-tiffin}:${POSTGRES_PASSWORD:-tiffin}@db:5432/${POSTGRES_DB:-fooddose_tiffin}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-720}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}

@@ -115,6 +115,7 @@ export function SiteFooter() {
         <div className="md:col-span-2">
           <Logo tone="light" className="text-lg" />
           <p className="mt-3 max-w-sm text-sm text-brand-200">{settings.tagline}</p>
+          <p className="mt-2 max-w-sm text-sm text-brand-200">{settings.contact_address}</p>
           <p className="mt-2 text-sm text-brand-200">{settings.service_hours}</p>
         </div>
         <div>

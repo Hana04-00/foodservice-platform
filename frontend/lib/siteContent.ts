@@ -31,33 +31,33 @@ export const WHY_CHOOSE_US: { title: string; body: string }[] = [
 ];
 
 export const ABOUT_PARAGRAPHS: string[] = [
-  "Ghar Se Tiffin started in a single home kitchen with a simple promise: a hot, balanced, home-style meal delivered on time, every working day.",
-  "We cook in small batches from a fixed weekly menu — dal, sabzi, roti, rice and a little something sweet — using fresh produce bought the same morning. No preservatives, no reheated leftovers, no mystery gravy.",
-  "Today we serve hundreds of plates a day across the city, but the kitchen still runs on the same rule it started with: if we wouldn't serve it at our own table, it doesn't go in the tiffin.",
+  "Food Dose Tiffin Service started in a single home kitchen with a simple promise: a hot, balanced, home-style meal delivered on time, every working day.",
+  "We cook in small batches from a fixed weekly menu — dal, sabzi, roti, rice and a little something extra — using fresh produce bought the same morning. No preservatives, no reheated leftovers, no mystery gravy.",
+  "Today we serve hundreds of plates a day out of Karol Bagh, New Delhi, but the kitchen still runs on the same rule it started with: if we wouldn't serve it at our own table, it doesn't go in the tiffin.",
 ];
 
 export const TESTIMONIALS: { name: string; area: string; quote: string }[] = [
   {
     name: "Aarti Sharma",
-    area: "Indiranagar",
+    area: "Karol Bagh",
     quote:
       "It genuinely tastes like my mother's cooking. The lunch reaches my desk warm at 12:45 sharp every single day.",
   },
   {
     name: "Rohan Mehta",
-    area: "Koramangala",
+    area: "Rajinder Nagar",
     quote:
       "I travel a lot for work. Being able to cancel a day before 10 AM and get the credit back is the reason I stayed.",
   },
   {
     name: "Priya Nair",
-    area: "Sarjapur Road",
+    area: "Patel Nagar",
     quote:
       "Six days of lunch and dinner for my whole family. The portions are honest and the rotation keeps it interesting.",
   },
   {
     name: "Imran Khan",
-    area: "BTM Layout",
+    area: "Paharganj",
     quote:
       "No preservatives, light on oil, and the dashboard shows me exactly what I've been billed for. Zero surprises.",
   },
@@ -71,15 +71,15 @@ export const TESTIMONIAL_VIDEOS: { title: string; poster: string; src: string }[
     src: "/videos/testimonial-1.mp4",
   },
   {
-    title: "Why Rohan switched to Ghar Se Tiffin",
-    poster: "/images/lunch-rajma-chawal.svg",
+    title: "Why Rohan switched to Food Dose Tiffin Service",
+    poster: "/images/lunch-saturday.svg",
     src: "/videos/testimonial-2.mp4",
   },
 ];
 
 export const MENU_PREVIEW_SLUGS = [
-  "lunch-rajma-chawal",
-  "lunch-paneer-butter-masala",
-  "dinner-dal-khichdi",
-  "dinner-palak-paneer",
+  "lunch-tuesday",
+  "lunch-saturday",
+  "dinner-saturday",
+  "dinner-sunday",
 ];

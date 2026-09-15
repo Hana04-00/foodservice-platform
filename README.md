@@ -1,4 +1,4 @@
-# Ghar Se Tiffin 🍱
+# Food Dose Tiffin Service 🍱
 
 A single centralized platform for a home-style tiffin / meal-subscription service:
 
@@ -126,7 +126,7 @@ GET  /admin/billing      POST /admin/invoices/generate
 cd backend
 python -m venv .venv && . .venv/Scripts/activate      # Windows
 pip install -r requirements.txt
-export DATABASE_URL=postgresql+psycopg://tiffin:tiffin@localhost:5432/gharse_tiffin
+export DATABASE_URL=postgresql+psycopg://tiffin:tiffin@localhost:5432/fooddose_tiffin
 alembic upgrade head
 python -m app.seed                      # add --reset to wipe & rebuild
 uvicorn app.main:app --reload --port 8000
@@ -153,7 +153,7 @@ cd backend && pytest          # cutoff, subscription→invoice flow, credits, pa
 
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `tiffin` / `tiffin` / `gharse_tiffin` | Postgres container |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `tiffin` / `tiffin` / `fooddose_tiffin` | Postgres container |
 | `DATABASE_URL` | derived | `postgresql+psycopg://…` |
 | `JWT_SECRET` | `change-me-in-production-please` | **set in production** |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `admin123` | seeded admin login |

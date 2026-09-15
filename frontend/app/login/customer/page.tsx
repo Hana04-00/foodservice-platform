@@ -111,7 +111,7 @@ export default function CustomerLogin() {
                     className="input"
                     value={form.area}
                     onChange={(e) => set("area", e.target.value)}
-                    placeholder="Indiranagar"
+                    placeholder="Karol Bagh"
                   />
                 </div>
                 <div>
@@ -120,7 +120,7 @@ export default function CustomerLogin() {
                     className="input"
                     value={form.pincode}
                     onChange={(e) => set("pincode", e.target.value)}
-                    placeholder="560001"
+                    placeholder="110005"
                   />
                 </div>
               </div>

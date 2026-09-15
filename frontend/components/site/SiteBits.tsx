@@ -85,7 +85,7 @@ export function PlanCard({ plan }: { plan: Plan }) {
   const featured = plan.badge.toLowerCase().includes("popular");
   const wa = waLink(
     settings.whatsapp_number,
-    `Hi Ghar Se Tiffin! I'd like to start the ${plan.name} plan.`,
+    `Hi Food Dose Tiffin Service! I'd like to start the ${plan.name} plan.`,
   );
   return (
     <div

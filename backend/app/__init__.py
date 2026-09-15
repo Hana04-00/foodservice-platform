@@ -1,1 +1,1 @@
-"""Ghar Se Tiffin backend package."""
+"""Food Dose Tiffin Service backend package."""

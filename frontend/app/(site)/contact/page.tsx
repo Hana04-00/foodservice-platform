@@ -14,10 +14,11 @@ export default function ContactPage() {
         sub="The fastest way to start, change or pause a plan is a WhatsApp message. We usually reply within the hour during service times."
       />
 
-      <div className="mx-auto mt-10 grid max-w-3xl gap-5 sm:grid-cols-3">
+      <div className="mx-auto mt-10 grid max-w-3xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { icon: "whatsapp" as const, label: "WhatsApp", value: s.contact_phone },
           { icon: "invoice" as const, label: "Email", value: s.contact_email },
+          { icon: "area" as const, label: "Address", value: s.contact_address },
           { icon: "clock" as const, label: "Service hours", value: s.service_hours },
         ].map((c) => (
           <div key={c.label} className="card p-5 text-center">

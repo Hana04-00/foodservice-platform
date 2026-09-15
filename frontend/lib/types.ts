@@ -289,6 +289,7 @@ export interface SiteSettings {
   whatsapp_number: string;
   contact_phone: string;
   contact_email: string;
+  contact_address: string;
   service_hours: string;
   cancellation_notice_hours: string;
 }

@@ -18,6 +18,7 @@ _PUBLIC_KEYS = (
     "whatsapp_number",
     "contact_phone",
     "contact_email",
+    "contact_address",
     "service_hours",
     "cancellation_notice_hours",
 )

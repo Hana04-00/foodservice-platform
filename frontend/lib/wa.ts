@@ -6,4 +6,4 @@ export function waLink(number: string, message?: string) {
 }
 
 export const DEFAULT_WA_MESSAGE =
-  "Hi Ghar Se Tiffin! I'd like to know more about your meal subscription plans.";
+  "Hi Food Dose Tiffin Service! I'd like to know more about your meal subscription plans.";
