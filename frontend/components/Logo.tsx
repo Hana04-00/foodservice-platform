@@ -22,7 +22,7 @@ export function Logo({
         <circle cx="16" cy="4.5" r="1.5" fill={accent} />
       </svg>
       <span className="leading-none">
-        Ghar Se <span className={tone === "light" ? "text-brand-100" : "text-brand-500"}>Tiffin</span>
+        Food Dose <span className={tone === "light" ? "text-brand-100" : "text-brand-500"}>Tiffin Service</span>
       </span>
     </span>
   );

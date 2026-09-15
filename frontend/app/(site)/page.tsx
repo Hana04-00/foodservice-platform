@@ -50,7 +50,7 @@ export default function HomePage() {
               Fresh · Home-style · Delivered daily
             </p>
             <h1 className="mt-4 text-4xl font-bold leading-tight text-brand-800 md:text-5xl">
-              Ghar ka khana,
+              Food Dose Tiffin Service
               <br />
               <span className="text-brand-600">on time, every day.</span>
             </h1>
@@ -229,7 +229,7 @@ export default function HomePage() {
             </div>
           </div>
           <MealImage
-            src="/images/lunch-paneer-butter-masala.svg"
+            src="/images/dinner-sunday.svg"
             alt="A home-style thali"
             className="h-full min-h-[220px] w-full object-cover"
           />
