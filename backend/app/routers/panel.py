@@ -21,7 +21,11 @@ from app.services import credits as credits_svc
 from app.services import settings_store
 from app.services.cutoff import is_open
 from app.services.invoicing import month_bounds
-from app.services.plates import covers, served_dates, skipped_dates
+from app.services.plates import adhoc_orders_between, covers, served_dates, skipped_dates
+
+
+def _order_summary(o) -> str:
+    return ", ".join(f"{i.qty}× {i.item_name}" for i in o.items) or "One-off order"
 
 router = APIRouter(prefix="/panel", tags=["panel"])
 
@@ -76,9 +80,18 @@ def dashboard(
                 elif d <= today:
                     consumed += s.plates_per_day
             d += timedelta(days=1)
+
+    # one-off orders placed this month count the same way (cancelled ones are
+    # excluded entirely, same as a subscription meal that was never scheduled)
+    adhoc_month = adhoc_orders_between(db, m_start, m_end, user_id=user.id)
+    for o in adhoc_month:
+        total_meals += o.total_qty
+        if o.date <= today:
+            consumed += o.total_qty
+
     remaining = max(total_meals - consumed - cancelled_month, 0)
 
-    # upcoming meals (next 10 scheduled slots)
+    # upcoming meals (next 21 days of scheduled subscription slots + one-off orders)
     upcoming: list[dict] = []
     for i in range(21):
         d = today + timedelta(days=i)
@@ -86,8 +99,6 @@ def dashboard(
             if not covers(s, d):
                 continue
             skipped = d in skips_by_sub.get(s.id, set())
-            if skipped and i == 0:
-                pass
             upcoming.append(
                 {
                     "date": d.isoformat(),
@@ -96,10 +107,22 @@ def dashboard(
                     "dish": _dish(s),
                     "status": "cancelled" if skipped else "scheduled",
                     "locked": not is_open(s.meal_type, d, now),
+                    "source": "subscription",
                 }
             )
-        if len(upcoming) >= 10:
-            break
+    for o in adhoc_orders_between(db, today, today + timedelta(days=21), user_id=user.id):
+        upcoming.append(
+            {
+                "date": o.date.isoformat(),
+                "weekday": WEEKDAY_NAMES[o.date.weekday()],
+                "meal_type": o.meal_type,
+                "dish": _order_summary(o),
+                "status": "scheduled",
+                "locked": not is_open(o.meal_type, o.date, now),
+                "source": "order",
+            }
+        )
+    upcoming.sort(key=lambda u: (u["date"], u["meal_type"]))
 
     # recent activity
     activity: list[dict] = []
@@ -130,6 +153,7 @@ def dashboard(
                 "meal_type": s.meal_type,
                 "detail": f"{s.meal_type.capitalize()} on {sk.date:%d %b} cancelled",
                 "credit_impact": float(cr.amount) if cr else 0.0,
+                "source": "subscription",
             }
         )
     for inv in db.scalars(
@@ -146,6 +170,7 @@ def dashboard(
                 "meal_type": "",
                 "detail": f"Invoice for {inv.period_year}-{inv.period_month:02d} generated ({inv.plates} plates)",
                 "credit_impact": 0.0,
+                "source": "subscription",
             }
         )
     # a few recently consumed meals
@@ -160,6 +185,48 @@ def dashboard(
                     "meal_type": s.meal_type,
                     "detail": f"{s.meal_type.capitalize()} on {d:%d %b} served",
                     "credit_impact": 0.0,
+                    "source": "subscription",
+                }
+            )
+    # one-off orders: one activity entry per order reflecting its current state
+    for o in adhoc_orders_between(
+        db, today - timedelta(days=14), today + timedelta(days=21), user_id=user.id, include_cancelled=True
+    ):
+        summary = _order_summary(o)
+        if o.status == "cancelled":
+            activity.append(
+                {
+                    "when": (o.updated_at or o.created_at or now).isoformat(),
+                    "date": o.date.isoformat(),
+                    "type": "cancelled",
+                    "meal_type": o.meal_type,
+                    "detail": f"{o.meal_type.capitalize()} one-off order for {o.date:%d %b} cancelled",
+                    "credit_impact": 0.0,
+                    "source": "order",
+                }
+            )
+        elif o.date <= today:
+            activity.append(
+                {
+                    "when": f"{o.date.isoformat()}T12:00:00",
+                    "date": o.date.isoformat(),
+                    "type": "consumed",
+                    "meal_type": o.meal_type,
+                    "detail": f"{o.meal_type.capitalize()} one-off order served on {o.date:%d %b}: {summary}",
+                    "credit_impact": 0.0,
+                    "source": "order",
+                }
+            )
+        else:
+            activity.append(
+                {
+                    "when": (o.created_at or now).isoformat(),
+                    "date": o.date.isoformat(),
+                    "type": "ordered",
+                    "meal_type": o.meal_type,
+                    "detail": f"{o.meal_type.capitalize()} one-off order placed for {o.date:%d %b}: {summary}",
+                    "credit_impact": 0.0,
+                    "source": "order",
                 }
             )
     activity.sort(key=lambda a: a["when"], reverse=True)
@@ -241,9 +308,38 @@ def meal_history(
                         "start_date": s.start_date.isoformat(),
                         "credit": float(cr.amount) if cr else 0.0,
                         "cancelled_at": (sk.created_at.isoformat() if sk and sk.created_at else None),
+                        "source": "subscription",
                     }
                 )
             d += timedelta(days=1)
+
+    for o in adhoc_orders_between(db, start, end, user_id=user.id, include_cancelled=True):
+        if o.status == "cancelled":
+            status = "cancelled"
+        elif o.status == "delivered" or o.date < today or (
+            o.date == today and not is_open(o.meal_type, o.date, now)
+        ):
+            status = "consumed"
+        else:
+            status = "upcoming"
+        rows.append(
+            {
+                "date": o.date.isoformat(),
+                "weekday": WEEKDAY_NAMES[o.date.weekday()],
+                "meal_type": o.meal_type,
+                "dish": _order_summary(o),
+                "status": status,
+                "amount": float(o.amount),
+                "plates": o.total_qty,
+                "order_date": (o.created_at.date().isoformat() if o.created_at else o.date.isoformat()),
+                "start_date": o.date.isoformat(),
+                "credit": 0.0,
+                "cancelled_at": (
+                    o.updated_at.isoformat() if o.status == "cancelled" and o.updated_at else None
+                ),
+                "source": "order",
+            }
+        )
 
     rows.sort(key=lambda r: (r["date"], r["meal_type"]), reverse=True)
 
@@ -291,11 +387,31 @@ def meal_calendar(
         for c in db.scalars(select(MealCredit).where(MealCredit.user_id == user.id)).all()
     }
     notice = settings_store.get_all(db).get("cancellation_notice_hours", "4")
+    orders_by_date: dict[date, list] = {}
+    for o in adhoc_orders_between(db, first, last, user_id=user.id, include_cancelled=True):
+        orders_by_date.setdefault(o.date, []).append(o)
 
     days: list[dict] = []
     d = first
     while d <= last:
-        entry: dict = {"date": d.isoformat(), "weekday": WEEKDAY_NAMES[d.weekday()], "is_today": d == today, "meals": {}}
+        entry: dict = {
+            "date": d.isoformat(),
+            "weekday": WEEKDAY_NAMES[d.weekday()],
+            "is_today": d == today,
+            "meals": {},
+            "orders": [
+                {
+                    "id": o.id,
+                    "meal_type": o.meal_type,
+                    "dish": _order_summary(o),
+                    "amount": float(o.amount),
+                    "status": o.status,
+                    "cancelled": o.status == "cancelled",
+                    "locked": not is_open(o.meal_type, o.date, now),
+                }
+                for o in orders_by_date.get(d, [])
+            ],
+        }
         for s in subs:
             in_window = (
                 d >= s.start_date
@@ -349,6 +465,7 @@ def my_credits(
             "status": c.status,
             "note": c.note,
             "issued_by": c.created_by,
+            "source": "order" if c.source_order_id else "subscription",
         }
         for c in rows
     ]

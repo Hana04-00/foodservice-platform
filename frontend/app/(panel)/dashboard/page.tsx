@@ -13,7 +13,13 @@ const ACTIVITY_STYLE: Record<string, { icon: Parameters<typeof Icon>[0]["name"];
   cancelled: { icon: "cancel", cls: "bg-danger-100 text-danger-600" },
   consumed: { icon: "check", cls: "bg-brand-100 text-brand-700" },
   renewed: { icon: "invoice", cls: "bg-amber-100 text-amber-700" },
+  ordered: { icon: "meals", cls: "bg-brand-50 text-brand-600" },
 };
+
+function SourceBadge({ source }: { source: "subscription" | "order" }) {
+  if (source !== "order") return null;
+  return <span className="pill bg-purple-50 text-purple-700">One-off order</span>;
+}
 
 export default function DashboardPage() {
   const load = useCallback(() => api.get<PanelDashboard>("/panel/dashboard"), []);
@@ -75,11 +81,14 @@ export default function DashboardPage() {
                     <div className="text-xs text-ink-faint">{m.dish}</div>
                   </div>
                 </div>
-                {m.status === "cancelled" ? (
-                  <span className="pill bg-danger-100 text-danger-700">Cancelled</span>
-                ) : (
-                  <span className="pill bg-brand-50 text-brand-700">Scheduled</span>
-                )}
+                <div className="flex items-center gap-2">
+                  <SourceBadge source={m.source} />
+                  {m.status === "cancelled" ? (
+                    <span className="pill bg-danger-100 text-danger-700">Cancelled</span>
+                  ) : (
+                    <span className="pill bg-brand-50 text-brand-700">Scheduled</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -110,9 +119,12 @@ export default function DashboardPage() {
                       <div className="text-xs text-ink-faint">{fmtDateTime(a.when)}</div>
                     </div>
                   </div>
-                  {a.credit_impact > 0 && (
-                    <span className="pill bg-brand-100 text-brand-800">+{rupees(a.credit_impact)}</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <SourceBadge source={a.source} />
+                    {a.credit_impact > 0 && (
+                      <span className="pill bg-brand-100 text-brand-800">+{rupees(a.credit_impact)}</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -120,9 +132,10 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {!data.has_subscription && (
+      {!data.has_subscription && data.upcoming_meals.length === 0 && data.recent_activity.length === 0 && (
         <EmptyState>
-          Once the kitchen activates your plan, your calendar, history and credits appear here.
+          Once the kitchen activates your plan (or you place a one-off order), your calendar,
+          history and credits appear here.
         </EmptyState>
       )}
 

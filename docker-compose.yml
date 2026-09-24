@@ -27,6 +27,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Kolkata}
+      SEED_MODE: ${SEED_MODE:-full}
       CORS_ORIGINS: http://localhost:3000
     ports:
       - "8000:8000"

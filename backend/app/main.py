@@ -11,7 +11,18 @@ from sqlalchemy.orm import Session
 from app.clock import now as clock_now
 from app.config import settings
 from app.database import get_db
-from app.routers import admin, auth, billing, menu, orders, panel, site, subscriptions
+from app.routers import (
+    admin,
+    auth,
+    billing,
+    customer_orders,
+    food_requests,
+    menu,
+    orders,
+    panel,
+    site,
+    subscriptions,
+)
 
 log = logging.getLogger("gharse")
 
@@ -39,6 +50,9 @@ for r in (
     orders.router,
     panel.router,
     site.router,
+    food_requests.router,
+    food_requests.admin_router,
+    customer_orders.router,
 ):
     app.include_router(r, prefix=API)
 

@@ -1,5 +1,10 @@
-"""Seed demo data: admin, customers, menu, subscriptions, a few skips, some
-admin-entered ad-hoc orders, and generated monthly invoices (paid / partial / overdue).
+"""Seed data: admin, menu, published plans, service areas, and business settings.
+
+With SEED_MODE=full (the default), also creates demo customers, subscriptions,
+a few skips, admin-entered ad-hoc orders, and generated monthly invoices
+(paid / partial / overdue). With SEED_MODE=minimal, only the menu/plans/service
+areas/site settings are created — the customers table is left empty and ready
+for real signups.
 
 Usage:
     python -m app.seed            # seed only if the DB looks empty
@@ -125,7 +130,9 @@ def seed() -> None:
         if "--reset" in sys.argv:
             _reset(db)
 
-        if db.scalar(select(User).limit(1)) and "--reset" not in sys.argv:
+        minimal = settings.seed_mode.strip().lower() == "minimal"
+
+        if db.scalar(select(MenuItem).limit(1)) and "--reset" not in sys.argv:
             print("Data already present — pass --reset to rebuild. Nothing to do.")
             return
 
@@ -163,6 +170,13 @@ def seed() -> None:
             if not db.get(AppSetting, key):
                 db.add(AppSetting(key=key, value=value))
         db.flush()
+
+        if minimal:
+            db.commit()
+            print(f"Seeded (minimal) {len(items)} menu items, {len(SITE_PLANS)} plans, "
+                  f"{len(SERVICE_AREAS)} service areas. No demo customers or orders created.")
+            print(f"Admin login: {settings.admin_username} / {settings.admin_password}")
+            return
 
         # --- customers + subscriptions ----------------------------------
         today = clock_now(db).date()

@@ -1,5 +1,7 @@
-"""Admin-entered ad-hoc orders: one-off itemized orders for a customer on a specific
-date + meal, outside their subscription. Admin-only; no customer-facing ordering."""
+"""Admin management of ad-hoc orders: one-off itemized orders for a customer on a
+specific date + meal, outside their subscription. Admin-only (list/create/update/
+delete any customer's order); see app/routers/customer_orders.py for the
+customer-facing self-service endpoints over the same table."""
 from __future__ import annotations
 
 from datetime import date
@@ -10,43 +12,15 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.deps import require_admin
-from app.models import AdHocOrder, AdHocOrderItem, MenuItem, User
+from app.models import AdHocOrder, User
 from app.schemas import AdHocOrderCreate, AdHocOrderOut, AdHocOrderUpdate
+from app.services import credits as credits_svc
+from app.services.adhoc_orders import build_items as _build_items
+from app.services.adhoc_orders import load_order as _load
 
 router = APIRouter(
     prefix="/admin/orders", tags=["admin-orders"], dependencies=[Depends(require_admin)]
 )
-
-
-def _load(db: Session, order_id: int) -> AdHocOrder | None:
-    return db.scalar(
-        select(AdHocOrder)
-        .options(joinedload(AdHocOrder.items), joinedload(AdHocOrder.user))
-        .where(AdHocOrder.id == order_id)
-    )
-
-
-def _build_items(db: Session, meal_type: str, rows) -> tuple[list[AdHocOrderItem], float]:
-    items: list[AdHocOrderItem] = []
-    amount = 0.0
-    for r in rows:
-        mi = db.get(MenuItem, r.menu_item_id)
-        if mi is None:
-            raise HTTPException(404, f"Menu item {r.menu_item_id} not found")
-        if mi.meal_type != meal_type:
-            raise HTTPException(422, f"'{mi.name}' is not a {meal_type} item.")
-        line_total = round(float(mi.price) * r.qty, 2)
-        amount += line_total
-        items.append(
-            AdHocOrderItem(
-                menu_item_id=mi.id,
-                item_name=mi.name,
-                qty=r.qty,
-                unit_price=float(mi.price),
-                line_total=line_total,
-            )
-        )
-    return items, round(amount, 2)
 
 
 @router.get("")
@@ -122,6 +96,7 @@ def update_order(
     order = _load(db, order_id)
     if order is None:
         raise HTTPException(404, "Order not found")
+    old_status = order.status
     if body.status is not None:
         order.status = body.status
     if body.notes is not None:
@@ -137,6 +112,12 @@ def update_order(
         items, amount = _build_items(db, body.meal_type or order.meal_type, body.items)
         order.items = items
         order.amount = amount
+    db.flush()
+    if body.status is not None and body.status != old_status:
+        if body.status == "cancelled":
+            credits_svc.issue_for_order_cancel(db, order, created_by="admin")
+        elif old_status == "cancelled":
+            credits_svc.void_for_order_cancel(db, order.id)
     db.commit()
     return AdHocOrderOut.from_model(_load(db, order.id))
 
@@ -146,6 +127,7 @@ def delete_order(order_id: int, db: Session = Depends(get_db)) -> dict:
     order = db.get(AdHocOrder, order_id)
     if order is None:
         raise HTTPException(404, "Order not found")
+    credits_svc.void_for_order_cancel(db, order.id)
     db.delete(order)
     db.commit()
     return {"deleted": order_id}

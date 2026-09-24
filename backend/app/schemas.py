@@ -30,6 +30,7 @@ class CustomerLogin(BaseModel):
 
 class CustomerRegister(CustomerLogin):
     name: str = Field(min_length=1, max_length=120)
+    email: str = Field(default="", max_length=160)
     pincode: str = Field(default="", max_length=12)
     address: str = Field(default="", max_length=2000)
     area: str = Field(default="", max_length=80)
@@ -265,6 +266,17 @@ class AdHocOrderCreate(BaseModel):
     items: list[AdHocOrderItemIn] = Field(min_length=1)
 
 
+class CustomerOrderCreate(BaseModel):
+    """Self-service one-off order: the customer picks a single menu item for a
+    date + meal, outside their subscription."""
+
+    date: date
+    meal_type: MealType
+    menu_item_id: int
+    qty: int = Field(default=1, ge=1, le=10)
+    notes: str = Field(default="", max_length=300)
+
+
 class AdHocOrderUpdate(BaseModel):
     status: Optional[AdHocStatus] = None
     notes: Optional[str] = Field(default=None, max_length=300)
@@ -383,6 +395,43 @@ class InvoicePayRequest(BaseModel):
 class InvoiceRecordPayment(BaseModel):
     amount: float = Field(gt=0)
     method: PayMethod = "cash"
+
+
+# ---------------------------------------------------------------- food requests
+FoodRequestStatus = Literal["new", "reviewed", "added_to_menu", "declined"]
+
+
+class FoodRequestCreate(BaseModel):
+    requested_item: str = Field(min_length=1, max_length=160)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class FoodRequestStatusUpdate(BaseModel):
+    status: FoodRequestStatus
+
+
+class FoodRequestOut(BaseModel):
+    id: int
+    customer_id: int
+    customer_name: str
+    customer_phone: str
+    requested_item: str
+    notes: Optional[str] = None
+    status: FoodRequestStatus
+    created_at: datetime
+
+    @classmethod
+    def from_model(cls, r) -> "FoodRequestOut":
+        return cls(
+            id=r.id,
+            customer_id=r.customer_id,
+            customer_name=r.customer.name if r.customer else "",
+            customer_phone=r.customer.phone if r.customer else "",
+            requested_item=r.requested_item,
+            notes=r.notes,
+            status=r.status,
+            created_at=r.created_at,
+        )
 
 
 # ---------------------------------------------------------------- admin

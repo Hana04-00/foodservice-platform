@@ -15,6 +15,7 @@ from app.database import get_db
 from app.deps import require_admin
 from app.models import (
     AdHocOrder,
+    FoodRequest,
     Invoice,
     MealCredit,
     MealSkip,
@@ -140,6 +141,12 @@ def dashboard(
         )
 
     cancellations_today = _cancellation_rows(db, day, day)
+    new_food_requests = (
+        db.scalar(select(func.count(FoodRequest.id)).where(FoodRequest.status == "new")) or 0
+    )
+    new_orders = (
+        db.scalar(select(func.count(AdHocOrder.id)).where(AdHocOrder.status == "confirmed")) or 0
+    )
 
     return {
         "as_of": now.isoformat(),
@@ -165,19 +172,23 @@ def dashboard(
         "area_customers": _area_report(db),
         "cancellations_today": cancellations_today[:15],
         "todays_meals": todays_meals[:12],
+        "new_food_requests": new_food_requests,
+        "new_orders": new_orders,
     }
 
 
 # --------------------------------------------------------------- cancellations / demand
 def _cancellation_rows(db: Session, date_from: date, date_to: date) -> list[dict]:
-    """Every cancelled meal in [date_from, date_to], newest meal first, each with its
-    own cancellation timestamp and the carry-forward credit it generated."""
-    rows = db.execute(
+    """Every cancelled meal in [date_from, date_to] — a subscription skip or a
+    cancelled ad-hoc order — newest first, each with its own cancellation
+    timestamp and the carry-forward credit it generated."""
+    out: list[dict] = []
+
+    skip_rows = db.execute(
         select(MealSkip, Subscription, User)
         .join(Subscription, MealSkip.subscription_id == Subscription.id)
         .join(User, Subscription.user_id == User.id)
         .where(MealSkip.date >= date_from, MealSkip.date <= date_to)
-        .order_by(MealSkip.date.desc(), MealSkip.id.desc())
     ).all()
     sub_items = {
         s.id: s
@@ -185,19 +196,19 @@ def _cancellation_rows(db: Session, date_from: date, date_to: date) -> list[dict
             select(Subscription).options(joinedload(Subscription.menu_item))
         ).all()
     }
-    out: list[dict] = []
-    for skip, sub, user in rows:
+    for skip, sub, user in skip_rows:
         full_sub = sub_items.get(sub.id, sub)
         credit = db.scalar(
             select(MealCredit).where(
                 MealCredit.user_id == user.id,
                 MealCredit.meal_date == skip.date,
                 MealCredit.meal_type == sub.meal_type,
+                MealCredit.source_order_id.is_(None),
             )
         )
         out.append(
             {
-                "id": skip.id,
+                "id": f"skip:{skip.id}",
                 "meal_date": skip.date.isoformat(),
                 "weekday": WEEKDAY_NAMES[skip.date.weekday()],
                 "cancelled_at": skip.created_at.isoformat() if skip.created_at else None,
@@ -210,8 +221,45 @@ def _cancellation_rows(db: Session, date_from: date, date_to: date) -> list[dict
                 "dish": full_sub.menu_item.name if full_sub.menu_item else "Kitchen's choice",
                 "plates": sub.plates_per_day,
                 "credit": float(credit.amount) if credit else round(float(sub.price) * sub.plates_per_day, 2),
+                "source": "subscription",
             }
         )
+
+    order_rows = db.scalars(
+        select(AdHocOrder)
+        .options(joinedload(AdHocOrder.items), joinedload(AdHocOrder.user))
+        .where(
+            AdHocOrder.status == "cancelled",
+            AdHocOrder.date >= date_from,
+            AdHocOrder.date <= date_to,
+        )
+    ).unique().all()
+    for o in order_rows:
+        user = o.user
+        if user is None:
+            continue
+        credit = db.scalar(select(MealCredit).where(MealCredit.source_order_id == o.id))
+        summary = ", ".join(f"{i.qty}× {i.item_name}" for i in o.items) or "One-off order"
+        out.append(
+            {
+                "id": f"order:{o.id}",
+                "meal_date": o.date.isoformat(),
+                "weekday": WEEKDAY_NAMES[o.date.weekday()],
+                "cancelled_at": o.updated_at.isoformat() if o.updated_at else None,
+                "cancelled_by": credit.created_by if credit else "customer",
+                "customer_id": user.id,
+                "customer_name": user.name,
+                "customer_phone": user.phone,
+                "area": user.area or "-",
+                "meal_type": o.meal_type,
+                "dish": summary,
+                "plates": o.total_qty,
+                "credit": float(credit.amount) if credit else float(o.amount),
+                "source": "order",
+            }
+        )
+
+    out.sort(key=lambda r: (r["meal_date"], r["cancelled_at"] or ""), reverse=True)
     return out
 
 

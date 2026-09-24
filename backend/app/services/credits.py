@@ -12,7 +12,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import MealCredit, Subscription
+from app.models import AdHocOrder, MealCredit, Subscription
 
 
 def plate_value(sub: Subscription) -> float:
@@ -59,6 +59,45 @@ def issue_for_skip(
     db.add(credit)
     db.flush()
     return credit
+
+
+def issue_for_order_cancel(
+    db: Session, order: AdHocOrder, *, created_by: str = "customer"
+) -> MealCredit | None:
+    """Book a carry-forward credit for a just-cancelled one-off order. Idempotent
+    per order — keyed on the order itself (not date+meal_type) so a subscription
+    meal and an ad-hoc order on the same date/meal both get their own credit."""
+    existing = db.scalar(select(MealCredit).where(MealCredit.source_order_id == order.id))
+    if existing is not None:
+        return existing
+
+    amount = round(float(order.amount), 2)
+    if amount <= 0:
+        return None
+
+    credit = MealCredit(
+        user_id=order.user_id,
+        amount=amount,
+        reason="cancellation",
+        meal_date=order.date,
+        meal_type=order.meal_type,
+        source_order_id=order.id,
+        created_by=created_by,
+        status="available",
+        note=f"One-off {order.meal_type} order on {order.date:%d %b %Y} cancelled",
+    )
+    db.add(credit)
+    db.flush()
+    return credit
+
+
+def void_for_order_cancel(db: Session, order_id: int) -> None:
+    """Remove the credit that backed an order cancellation now reversed (e.g. the
+    kitchen reinstates an order it had marked cancelled)."""
+    row = db.scalar(select(MealCredit).where(MealCredit.source_order_id == order_id))
+    if row is not None:
+        db.delete(row)
+        db.flush()
 
 
 def void_for_skip(db: Session, *, user_id: int, meal_date: date, meal_type: str) -> None:

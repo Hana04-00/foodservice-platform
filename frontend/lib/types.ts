@@ -3,6 +3,7 @@ export type SubStatus = "active" | "paused" | "cancelled";
 export type PayMethod = "cash" | "upi" | "card" | "netbanking";
 export type AdHocStatus = "confirmed" | "preparing" | "delivered" | "cancelled";
 export type InvoiceStatus = "pending" | "partial" | "paid" | "overdue";
+export type FoodRequestStatus = "new" | "reviewed" | "added_to_menu" | "declined";
 
 export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -150,6 +151,17 @@ export interface AdHocOrder {
   total_qty: number;
   items: AdHocOrderItem[];
   summary: string;
+}
+
+export interface FoodRequest {
+  id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_phone: string;
+  requested_item: string;
+  notes: string | null;
+  status: FoodRequestStatus;
+  created_at: string;
 }
 
 export interface AdminCustomerRow {
@@ -309,6 +321,7 @@ export interface CreditEntry {
   status: "available" | "consumed";
   note: string;
   issued_by: string;
+  source: MealSource;
 }
 
 export interface CreditsResponse {
@@ -318,6 +331,8 @@ export interface CreditsResponse {
   items: CreditEntry[];
 }
 
+export type MealSource = "subscription" | "order";
+
 export interface UpcomingMeal {
   date: string;
   weekday: string;
@@ -325,15 +340,17 @@ export interface UpcomingMeal {
   dish: string;
   status: "scheduled" | "cancelled";
   locked: boolean;
+  source: MealSource;
 }
 
 export interface ActivityItem {
   when: string;
   date: string;
-  type: "cancelled" | "consumed" | "renewed";
+  type: "cancelled" | "consumed" | "renewed" | "ordered";
   meal_type: string;
   detail: string;
   credit_impact: number;
+  source: MealSource;
 }
 
 export interface PanelDashboard {
@@ -364,6 +381,7 @@ export interface MealHistoryRow {
   start_date: string;
   credit: number;
   cancelled_at: string | null;
+  source: MealSource;
 }
 
 export interface MealHistoryResponse {
@@ -382,11 +400,22 @@ export interface CalendarMeal {
   amount: number;
 }
 
+export interface CalendarOrder {
+  id: number;
+  meal_type: MealType;
+  dish: string;
+  amount: number;
+  status: AdHocStatus;
+  cancelled: boolean;
+  locked: boolean;
+}
+
 export interface CalendarDay {
   date: string;
   weekday: string;
   is_today: boolean;
   meals: Partial<Record<MealType, CalendarMeal>>;
+  orders: CalendarOrder[];
 }
 
 export interface CalendarResponse {
@@ -402,7 +431,7 @@ export interface CalendarResponse {
 }
 
 export interface CancellationRow {
-  id: number;
+  id: string;
   meal_date: string;
   weekday: string;
   cancelled_at: string | null;
@@ -415,6 +444,7 @@ export interface CancellationRow {
   dish: string;
   plates: number;
   credit: number;
+  source: MealSource;
 }
 
 export interface CancellationsResponse {
@@ -504,4 +534,6 @@ export interface AdminDashboardV2 {
     qty: number;
     status: string;
   }[];
+  new_food_requests: number;
+  new_orders: number;
 }

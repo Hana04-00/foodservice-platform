@@ -31,6 +31,7 @@ def register_customer(body: CustomerRegister, db: Session = Depends(get_db)) -> 
         name=body.name.strip(),
         phone=body.phone.strip(),
         pin_hash=hash_secret(body.pin),
+        email=body.email.strip(),
         pincode=body.pincode.strip(),
         address=body.address.strip(),
         area=body.area.strip(),

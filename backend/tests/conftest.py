@@ -1,14 +1,56 @@
 """Test fixtures. Uses a throwaway SQLite DB and the simulated payment gateway
 with zero latency so the order/payment flow tests run fast.
+
+SAFETY: the autouse `_clean_db` fixture below deletes every row in every table
+before each test. If this suite ever ran against a real database, that would
+destroy live data. To make that impossible to forget, `_require_disposable_db`
+hard-fails at collection time unless DATABASE_URL is a sqlite file or a Postgres
+URL whose database name contains "test" — see that function for how to point
+tests at a dedicated Postgres test database instead of the default sqlite file.
 """
 from __future__ import annotations
 
 import os
 import pathlib
 
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///./test_gharse.db")
+_DEFAULT_TEST_DB_URL = "sqlite+pysqlite:///./test_gharse.db"
+os.environ.setdefault("DATABASE_URL", _DEFAULT_TEST_DB_URL)
 os.environ.setdefault("JWT_SECRET", "test-secret")
 os.environ.setdefault("APP_TIMEZONE", "Asia/Kolkata")
+
+
+def _require_disposable_db(url: str) -> None:
+    """Refuse to run the suite unless DATABASE_URL is obviously throwaway.
+
+    A sqlite URL always qualifies. A Postgres (or other) URL only qualifies if
+    "test" appears in it (by convention, in the database name) — e.g.
+    postgresql+psycopg://tiffin:tiffin@db:5432/gharse_tiffin_test. This is what
+    stops `pytest` run inside the backend container — where DATABASE_URL is
+    already set to the real app database by docker-compose.yml — from silently
+    wiping live data: that URL contains neither "sqlite" nor "test", so it fails
+    this check instead of reaching the cleanup fixture.
+    """
+    low = url.lower()
+    if "sqlite" in low or "test" in low:
+        return
+    raise RuntimeError(
+        f"Refusing to run tests: DATABASE_URL={url!r} does not look like a "
+        "disposable test database.\n"
+        "This suite wipes every table before every test (see the autouse "
+        "_clean_db fixture in tests/conftest.py) — running it against a real "
+        "database would destroy live data.\n"
+        "Fix: unset DATABASE_URL to use the default throwaway sqlite file "
+        f"({_DEFAULT_TEST_DB_URL!r}), or set it to a Postgres database whose "
+        "name contains 'test', e.g.:\n"
+        "  DATABASE_URL=postgresql+psycopg://tiffin:tiffin@db:5432/gharse_tiffin_test pytest\n"
+        "Inside Docker, since the backend service's DATABASE_URL points at the "
+        "real app database:\n"
+        "  docker compose run --rm --entrypoint '' "
+        f"-e DATABASE_URL={_DEFAULT_TEST_DB_URL} backend pytest"
+    )
+
+
+_require_disposable_db(os.environ["DATABASE_URL"])
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -171,6 +171,10 @@ const PILL_MAP: Record<string, string> = {
   inactive: "bg-brand-100/60 text-ink-faint",
   consumed_credit: "bg-brand-100/60 text-ink-faint",
   none: "bg-brand-100/60 text-ink-faint",
+  new: "bg-amber-100 text-amber-800",
+  reviewed: "bg-brand-50 text-brand-700",
+  added_to_menu: "bg-brand-100 text-brand-800",
+  declined: "bg-danger-100 text-danger-700",
 };
 
 export function StatusPill({ status }: { status?: string | null }) {
@@ -179,7 +183,7 @@ export function StatusPill({ status }: { status?: string | null }) {
   return (
     <span className={`pill capitalize ${PILL_MAP[s] || PILL_MAP.none}`}>
       {withIcon && <Icon name="check" className="h-3 w-3" />}
-      {s}
+      {s.replace(/_/g, " ")}
     </span>
   );
 }

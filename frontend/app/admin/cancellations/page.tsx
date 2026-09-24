@@ -118,7 +118,12 @@ export default function CancellationsPage() {
                           {r.meal_type}
                         </span>
                       </td>
-                      <td className="td text-ink">{r.dish}</td>
+                      <td className="td text-ink">
+                        {r.dish}
+                        {r.source === "order" && (
+                          <span className="pill ml-1.5 bg-purple-50 text-purple-700">One-off</span>
+                        )}
+                      </td>
                       <td className="td capitalize">{r.cancelled_by}</td>
                       <td className="td text-right font-semibold text-brand-700">+{rupees(r.credit)}</td>
                     </tr>

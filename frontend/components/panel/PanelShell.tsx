@@ -11,6 +11,7 @@ export interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentProps<typeof Icon>["name"];
+  count?: number;
 }
 
 export function PanelShell({
@@ -49,7 +50,12 @@ export function PanelShell({
           className={`sidebar-link ${isActive(item.href) ? "sidebar-link-active" : ""}`}
         >
           <Icon name={item.icon} className="h-[18px] w-[18px] shrink-0" />
-          <span className="truncate">{item.label}</span>
+          <span className="flex-1 truncate">{item.label}</span>
+          {!!item.count && (
+            <span className="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-danger-500 px-1.5 text-[11px] font-semibold text-white">
+              {item.count > 99 ? "99+" : item.count}
+            </span>
+          )}
         </Link>
       ))}
       <button onClick={logout} className="sidebar-link mt-1 text-left">

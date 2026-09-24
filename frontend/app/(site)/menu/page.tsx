@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ChatButton, Section, SectionHead } from "@/components/site/SiteBits";
+import { SuggestDishForm } from "@/components/site/SuggestDishForm";
 import { MealImage, rupees } from "@/components/ui";
 import { api } from "@/lib/api";
 import type { MenuItem } from "@/lib/types";
@@ -52,6 +53,10 @@ export default function MenuPage() {
           title="This is what home tastes like"
           sub="A fixed weekly rotation. Every thali comes with roti, rice, a sabzi, dal and a little something extra."
         />
+
+        <div className="mt-6 flex justify-center">
+          <SuggestDishForm />
+        </div>
 
         {state === "loading" && (
           <p className="mt-12 text-center text-ink-soft">Loading this week&apos;s menu…</p>

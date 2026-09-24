@@ -67,11 +67,24 @@ export default function CalendarPage() {
             const meal = selected?.meals[mealType];
             if (!selected || !meal) return;
             setCancelFor({
+              kind: "subscription",
               subscription_id: meal.subscription_id,
               date: selected.date,
               meal_type: mealType,
               dish: meal.dish,
               amount: meal.amount,
+            });
+          }}
+          onCancelOrder={(orderId) => {
+            const order = selected?.orders.find((o) => o.id === orderId);
+            if (!selected || !order) return;
+            setCancelFor({
+              kind: "order",
+              order_id: order.id,
+              date: selected.date,
+              meal_type: order.meal_type,
+              dish: order.dish,
+              amount: order.amount,
             });
           }}
         />

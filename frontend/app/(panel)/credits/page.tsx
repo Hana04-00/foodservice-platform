@@ -62,6 +62,10 @@ export default function CreditsPage() {
                       <Icon name={c.meal_type} className="h-4 w-4 text-brand-500" />
                       {c.meal_type} · {fmtDate(c.meal_date)}
                     </span>
+                    {c.source === "order" && (
+                      <span className="pill ml-1.5 bg-purple-50 text-purple-700">One-off</span>
+                    )}
+                    <div className="mt-0.5 text-[11px] text-ink-faint">{c.note}</div>
                   </td>
                   <td className="td capitalize">{c.reason}</td>
                   <td className="td">

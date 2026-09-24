@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: str = "http://localhost:3000"
 
+    # --- Seeding ---
+    # "full" (default): demo customers, subscriptions, skips, ad-hoc orders, invoices.
+    # "minimal": menu/plans/service areas/site settings only — customers table stays
+    # empty and ready for real signups.
+    seed_mode: str = "full"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

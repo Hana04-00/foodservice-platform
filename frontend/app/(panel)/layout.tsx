@@ -6,6 +6,7 @@ import { useAuthGuard } from "@/lib/hooks";
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/subscription", label: "My Subscription", icon: "subscription" },
+  { href: "/order", label: "Place an Order", icon: "meals" },
   { href: "/calendar", label: "Meal Calendar", icon: "calendar" },
   { href: "/history", label: "Meal History", icon: "history" },
   { href: "/cancel", label: "Cancel Meals", icon: "cancel" },

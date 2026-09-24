@@ -79,7 +79,12 @@ export default function HistoryPage() {
                       {r.meal_type}
                     </span>
                   </td>
-                  <td className="td text-ink">{r.dish}</td>
+                  <td className="td text-ink">
+                    {r.dish}
+                    {r.source === "order" && (
+                      <span className="pill ml-1.5 bg-purple-50 text-purple-700">One-off</span>
+                    )}
+                  </td>
                   <td className="td whitespace-nowrap">{fmtDate(r.order_date)}</td>
                   <td className="td whitespace-nowrap">{fmtDate(r.start_date)}</td>
                   <td className="td whitespace-nowrap text-ink">{rupees(r.amount)}</td>

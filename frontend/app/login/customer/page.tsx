@@ -16,6 +16,7 @@ export default function CustomerLogin() {
     name: "",
     phone: "",
     pin: "",
+    email: "",
     area: "",
     pincode: "",
     address: "",
@@ -104,6 +105,16 @@ export default function CustomerLogin() {
           </div>
           {mode === "register" && (
             <>
+              <div>
+                <label className="label">Email</label>
+                <input
+                  className="input"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label">Area</label>

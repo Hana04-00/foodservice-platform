@@ -151,6 +151,7 @@ export default function SubscriptionPage() {
                           onClick={() =>
                             setCancelFor({
                               key: `${s.id}:${d.date}`,
+                              kind: "subscription",
                               subscription_id: s.id,
                               date: d.date,
                               meal_type: s.meal_type,

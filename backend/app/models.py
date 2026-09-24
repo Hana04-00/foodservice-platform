@@ -284,6 +284,9 @@ class MealCredit(Base):
     source_skip_id: Mapped[int | None] = mapped_column(
         ForeignKey("meal_skips.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    source_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ad_hoc_orders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_by: Mapped[str] = mapped_column(String(10), nullable=False, default="customer")
     status: Mapped[str] = mapped_column(
         String(10), nullable=False, default="available"
@@ -294,6 +297,32 @@ class MealCredit(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="credits")
+
+
+class FoodRequest(Base):
+    """A customer's suggestion for a dish not currently on the fixed weekly menu.
+
+    Purely an inbox for the kitchen to review — it never changes MenuItem on its
+    own. If the owner likes an idea, they add it to the real menu themselves via
+    the menu manager.
+    """
+
+    __tablename__ = "food_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    requested_item: Mapped[str] = mapped_column(String(160), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="new"
+    )  # new | reviewed | added_to_menu | declined
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    customer: Mapped["User"] = relationship()
 
 
 class Plan(Base):

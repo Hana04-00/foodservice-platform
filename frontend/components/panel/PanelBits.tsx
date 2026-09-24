@@ -1,6 +1,6 @@
 "use client";
 
-import { Icon } from "@/components/ui";
+import { Icon, rupees } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { CalendarDay, CalendarResponse } from "@/lib/types";
 
@@ -29,6 +29,7 @@ export function CalendarLegend() {
     { label: "Meal Included", cls: "bg-brand-500" },
     { label: "Cancelled", cls: "bg-danger-500" },
     { label: "Credit Used", cls: "bg-amber-400" },
+    { label: "One-off Order", cls: "bg-purple-500" },
   ];
   return (
     <div className="flex flex-wrap gap-4 text-xs text-ink-soft">
@@ -89,7 +90,7 @@ export function MonthCalendar({
         ))}
         {data.days.map((day) => {
           const isSel = selected === day.date;
-          const hasAny = Object.keys(day.meals).length > 0;
+          const hasAny = Object.keys(day.meals).length > 0 || day.orders.length > 0;
           return (
             <button
               key={day.date}
@@ -117,6 +118,9 @@ export function MonthCalendar({
                     {day.meals.dinner && (
                       <span className={`h-1.5 w-1.5 rounded-full ${dayDot(day.meals.dinner)}`} />
                     )}
+                    {day.orders.length > 0 && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+                    )}
                   </>
                 )}
               </span>
@@ -132,10 +136,12 @@ export function DayDetailPanel({
   day,
   noticeHours,
   onCancel,
+  onCancelOrder,
 }: {
   day: CalendarDay | null;
   noticeHours: string;
   onCancel: (mealType: "lunch" | "dinner") => void;
+  onCancelOrder?: (orderId: number) => void;
 }) {
   if (!day) {
     return (
@@ -143,10 +149,11 @@ export function DayDetailPanel({
     );
   }
   const meals = (["lunch", "dinner"] as const).filter((m) => day.meals[m]);
+  const orders = day.orders ?? [];
   return (
     <div className="card p-5">
       <div className="text-sm font-bold text-brand-800">{fmtDate(day.date)}</div>
-      {meals.length === 0 && (
+      {meals.length === 0 && orders.length === 0 && (
         <p className="mt-3 text-sm text-ink-faint">No meals scheduled for this day.</p>
       )}
       <div className="mt-3 space-y-3">
@@ -178,6 +185,34 @@ export function DayDetailPanel({
             </div>
           );
         })}
+        {orders.map((o) => (
+          <div key={o.id} className="rounded-xl border border-purple-200 bg-purple-50/40 p-3">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold capitalize text-ink">
+                <Icon name={o.meal_type} className="h-4 w-4 text-brand-500" />
+                {o.meal_type}
+                <span className="pill bg-purple-100 text-purple-800">One-off order</span>
+              </span>
+              {o.cancelled ? (
+                <span className="pill bg-danger-100 text-danger-700">Cancelled</span>
+              ) : (
+                <span className="pill capitalize bg-brand-100 text-brand-800">{o.status}</span>
+              )}
+            </div>
+            <div className="mt-1 text-sm text-ink-soft">
+              {o.dish} · {rupees(o.amount)}
+            </div>
+            {!o.cancelled && o.status !== "delivered" && onCancelOrder && (
+              <button
+                className="btn-danger-ghost mt-3 w-full py-1.5 text-xs disabled:opacity-40"
+                disabled={o.locked}
+                onClick={() => onCancelOrder(o.id)}
+              >
+                {o.locked ? "Past cutoff — locked" : "Cancel Order"}
+              </button>
+            )}
+          </div>
+        ))}
       </div>
       <p className="mt-4 text-xs text-ink-faint">
         Cancellation allowed up to {noticeHours} hours before meal time.

@@ -4,10 +4,10 @@ A single centralized platform for a home-style tiffin / meal-subscription servic
 
 - **Public website** — home, menu, plans, about, areas we serve, contact, with a
   persistent *Enquire on WhatsApp* button.
-- **User panel** — dashboard, subscription, meal calendar, meal history, cancel
-  meals, credits & carry-forward, profile & address, invoices.
-- **Admin panel** — dashboard, total meals, cancellations, customers, meal demand,
-  area-wise report, settings.
+- **User panel** — dashboard, subscription, place an order, meal calendar, meal
+  history, cancel meals, credits & carry-forward, profile & address, invoices.
+- **Admin panel** — dashboard, total meals, cancellations, customers, orders, meal
+  demand, food requests, area-wise report, settings.
 
 The public site, both panels, and the database all read and write the **same**
 order and cancellation data — every customer action shows up on the admin side with
@@ -38,10 +38,13 @@ docker compose up --build
 | http://localhost:3000 | Public website + user panel + admin panel |
 | http://localhost:8000/docs | Backend OpenAPI docs |
 
-On first boot the backend runs **Alembic migrations** and an idempotent **seed**:
-demo customers (with areas), the menu, subscriptions, a few cancellations and the
-carry-forward credit each earned, three published plans, six service areas, business
-settings, and previous/current-month invoices.
+On first boot the backend runs **Alembic migrations** and an idempotent **seed**.
+By default (`SEED_MODE=full`) that includes demo customers (with areas), the menu,
+subscriptions, a few cancellations and the carry-forward credit each earned, three
+published plans, six service areas, business settings, and previous/current-month
+invoices. Set `SEED_MODE=minimal` to seed only the menu, plans, service areas, and
+business settings — no demo customers, subscriptions, or orders — leaving the
+customers table empty and ready for real signups.
 
 ### Demo logins
 
@@ -80,11 +83,38 @@ cancellations and warnings; a green check marks consumed/confirmed. Fully respon
   (subscription created), start date, amount, meal type and status
   (upcoming / consumed / cancelled). Every cancellation stores its own
   timestamp, visible to the customer and in the admin **Cancellations** report.
+- **Place an order** — a logged-in customer can buy a one-off plate outside their
+  subscription from the **Place an Order** panel page: pick a date, meal and dish
+  from the live menu. It creates the same `AdHocOrder` row an admin-entered order
+  does (`app/routers/orders.py` for admin, `app/routers/customer_orders.py` for the
+  customer's own create/list, sharing pricing logic in
+  `app/services/adhoc_orders.py`), so it bills, reports and shows up in the kitchen
+  plate count exactly like one the kitchen enters manually. The admin **Orders**
+  tab lists every ad-hoc order (either source) with a status dropdown
+  (confirmed / preparing / delivered / cancelled) and a "new" (confirmed) count
+  badge in the sidebar. On the customer side, one-off orders are folded into
+  every "all my meals" view alongside subscription meals — dashboard stats
+  (Total/Consumed/Remaining), Upcoming Meals, Recent Activity, Meal History
+  (all four tabs) and the Meal Calendar all include them, tagged with a small
+  **One-off** badge so the two sources stay distinguishable. A customer can
+  also cancel their own upcoming one-off order (before the same lunch/dinner
+  cutoff as ordering) from **Cancel Meals** or the calendar's day panel. Just
+  like a subscription skip, this books a `MealCredit` for the order's value
+  (`app/services/credits.py:issue_for_order_cancel`, keyed on the order itself
+  so it can't collide with a subscription credit on the same date/meal) —
+  it shows up on **Credits & Carry Forward** and the admin credit balance
+  immediately, tagged **One-off** to distinguish it.
 - **Kitchen demand** — for any date, plates to cook per meal = active subscriptions
   covering that day, minus cancellations, plus ad-hoc orders, with a per-dish prep
   list. Drives the admin dashboard, **Meal Demand** and **Total Meals**.
 - **Monthly invoicing** — the kitchen generates a per-customer invoice for a month:
   served (covered, not cancelled, not future) plates × price, plus ad-hoc orders.
+- **Food requests** — a "suggest a dish" inbox: any logged-in customer can suggest
+  an item that isn't on the fixed weekly menu from the **Menu** page. The kitchen
+  reviews suggestions in the admin **Food Requests** tab (new / reviewed / added to
+  menu / declined) and a badge shows the count still marked "new". This is purely a
+  suggestion inbox — it never changes `MenuItem`; adding a dish for real is still a
+  manual step in the menu manager.
 
 ---
 
@@ -105,6 +135,9 @@ GET  /panel/dashboard                   GET /panel/credits
 GET  /panel/meals/history?filter=       GET /panel/meals/calendar?year=&month=
 GET  /billing/me
 
+POST /food-requests                     (logged-in customer suggests a dish)
+GET  /orders             POST /orders   DELETE /orders/{id}   (customer's own ad-hoc orders)
+
 GET  /admin/dashboard                   GET /admin/meal-demand?date=
 GET  /admin/total-meals?date_from=&date_to=
 GET  /admin/cancellations?date_from=&date_to=
@@ -114,6 +147,9 @@ GET  /admin/customers/{id}              POST /admin/customers/{id}/subscription
 PATCH /admin/subscriptions/{id}
 GET/PUT /admin/settings
 GET  /admin/billing      POST /admin/invoices/generate
+GET  /admin/food-requests?status=       PATCH /admin/food-requests/{id}
+GET  /admin/orders?status=&meal_type=&q=&date_from=&date_to=   POST /admin/orders
+GET  /admin/orders/{id}  PATCH /admin/orders/{id}   DELETE /admin/orders/{id}
 ```
 
 ---
@@ -129,6 +165,7 @@ pip install -r requirements.txt
 export DATABASE_URL=postgresql+psycopg://tiffin:tiffin@localhost:5432/fooddose_tiffin
 alembic upgrade head
 python -m app.seed                      # add --reset to wipe & rebuild
+# SEED_MODE=minimal python -m app.seed  # menu/plans/service areas only, no demo customers
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -147,6 +184,18 @@ npm run dev            # http://localhost:3000
 cd backend && pytest          # cutoff, subscription→invoice flow, credits, panel & admin reports
 ```
 
+The suite wipes every table before every test, so it always runs against a throwaway
+database — never the real one. It defaults to a local sqlite file
+(`test_gharse.db`) with no setup needed; `tests/conftest.py` refuses to start
+(hard error, before any table is touched) unless `DATABASE_URL` is sqlite or a
+Postgres URL with `test` in the database name. Inside Docker, since the backend
+container's `DATABASE_URL` points at the real app database, run tests with an
+explicit override:
+
+```bash
+docker compose run --rm --entrypoint "" -e DATABASE_URL=sqlite+pysqlite:///./test_gharse.db backend pytest
+```
+
 ---
 
 ## Environment variables
@@ -158,6 +207,7 @@ cd backend && pytest          # cutoff, subscription→invoice flow, credits, pa
 | `JWT_SECRET` | `change-me-in-production-please` | **set in production** |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / `admin123` | seeded admin login |
 | `APP_TIMEZONE` | `Asia/Kolkata` | timezone the 10:00 / 18:00 cutoffs run in |
+| `SEED_MODE` | `full` | `full` seeds demo customers/subscriptions/orders/invoices too; `minimal` seeds only menu/plans/service areas/site settings, leaving customers empty for real signups |
 | `NEXT_PUBLIC_API_BASE` | `http://localhost:8000/api/v1` | browser → API URL (build-time for the image) |
 
 Business details (WhatsApp number, contact, service hours, kitchen capacity) are
